@@ -487,9 +487,15 @@ const humanReviewStates = {
   precisa_de_ajuste:['Precisa de ajuste','Há erro, exagero ou contexto faltando.'],
   sem_suporte_suficiente:['Sem suporte suficiente','Os documentos consultados não permitem sustentar a afirmação.']
 };
+// Human checks are solid marks; only a check against the original carries ✓ (text, not color).
 function humanReviewBadge(item) {
   const state = item.revisao_humana?.estado || 'pendente';
-  return element('span', humanReviewStates[state][0], `human-review-badge human-${state}`);
+  const badge = element('span', undefined, `human-review-badge human-${state}`);
+  if (state === 'conferida_no_original') {
+    const mark = element('span', '✓'); mark.setAttribute('aria-hidden', 'true'); badge.append(mark, ' ');
+  }
+  badge.append(humanReviewStates[state][0]);
+  return badge;
 }
 function findingsError(message = '') {
   $('achados-erro').textContent = message; $('achados-erro').hidden = !message;
@@ -683,8 +689,12 @@ async function openBriefing(artifact, scope, version) {
     }
   }
 }
+// The AI's own support verdict: outlined pill, always prefixed "IA".
 function supportBadge(item) {
-  return element('span',`Suporte: ${pretty(item.suporte)} · revisão da IA`,`support-badge support-${item.suporte}`);
+  const badge = element('span', undefined, `support-badge ai-support support-${item.suporte}`);
+  badge.title = 'Suporte documental avaliado pela IA';
+  badge.append(element('span', 'IA', 'badge-origin'), ' · ', element('span', pretty(item.suporte)));
+  return badge;
 }
 function selectFinding(item, scope, version, focus = false) {
   selectedFindingId = item.id;

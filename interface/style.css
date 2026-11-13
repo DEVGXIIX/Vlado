@@ -257,3 +257,11 @@ body[data-modo="piloto"] #codex-desligar{display:none}
 .finding-detail>.actions.finding-actions{margin:20px 0 6px}
 .finding-detail>.small{margin:6px 0}
 .evidence .actions>button:first-child{font-size:13px}
+/* AI verdict vs human check: different prefix, shape and fill, never color alone. */
+.support-badge.ai-support{background:transparent;color:var(--ink);border:1px solid var(--muted);border-radius:999px;padding:2px 10px;font-weight:500}
+.support-badge.ai-support .badge-origin{font-weight:700;letter-spacing:.04em}
+.support-badge.ai-support:is(.support-parcial,.support-nao_sustentado,.support-ilegivel){background:transparent;color:var(--warning);border-color:var(--warning)}
+:root[data-theme=dark] .support-badge.ai-support.support-nao_sustentado{background:transparent;color:var(--theme-danger);border-color:var(--theme-danger)}
+.human-review-badge{border:1px solid transparent;border-radius:4px}
+.human-review-badge.human-pendente{background:transparent;color:var(--muted);border:1px dashed var(--muted)}
+.human-review-badge.human-conferida_no_original{background:var(--green);color:var(--theme-on-primary,#fff);border-color:var(--green);font-weight:600}
