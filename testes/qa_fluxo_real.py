@@ -2,6 +2,7 @@
 import argparse
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import shutil
 import sys
@@ -35,7 +36,12 @@ def main():
     origem = ler_json(ROOT / 'configuracao.json')
     escrever_json(root / 'configuracao.json', {'caso_ativo': None, 'manifesto_ativo': None,
         'maximo_documentos_inicial': 20, 'indice_sqlite': True, 'web_na_apuracao': False,
-        **{k: origem.get(k) for k in ('provedor', 'modelo_preferido', 'max_tokens_saida') if k in origem}})
+        **{k: origem.get(k) for k in ('provedor', 'modelo_preferido', 'max_tokens_saida', 'limites') if k in origem}})
+    # Use the provider chosen and the key pasted in the Mesa (the environment variable still wins).
+    if (ROOT / 'ajustes/inferencia.json').is_file():
+        (root / 'ajustes').mkdir()
+        shutil.copyfile(ROOT / 'ajustes/inferencia.json', root / 'ajustes/inferencia.json')
+    os.environ.setdefault('VLADO_SEGREDOS', str(ROOT / 'segredos' / 'chaves.json'))
     files = []
     for name, content in [('ata.txt', 'MATERIAL SINTÉTICO — TESTE TÉCNICO.\nEm 10 de janeiro de 2040, o grupo fictício Aurora realizou uma reunião.\n'),
                           ('aviso.txt', 'MATERIAL SINTÉTICO — TESTE TÉCNICO.\nEm 15 de janeiro de 2040, o grupo fictício Aurora publicou um aviso sobre a reunião.\n')]:
