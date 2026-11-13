@@ -116,7 +116,7 @@ class Conversas:
             ctx['events'].append(event)
             self.condition.notify_all()
 
-    def listar(self, caso):
+    def listar(self, caso, dono=None):
         if not isinstance(caso, str) or not re.fullmatch(r'[a-z0-9][a-z0-9_-]{0,63}', caso):
             raise ValueError('Selecione um caso.')
         lixeira.conferir_disponivel(self.root, caso)
@@ -124,6 +124,8 @@ class Conversas:
         result = []
         for path in sorted(self.folder.glob('*/conversa.json')) if self.folder.exists() else []:
             meta = ler_json(path)
+            if dono is not None and meta.get('dono') != dono:
+                continue
             if meta.get('caso') == caso and not lixeira.excluido(self.root, caso, conversa=meta['id'], itens=removed):
                 item = {k: meta.get(k) for k in ('id', 'caso', 'titulo', 'corpus_id', 'estado', 'criada_em_utc', 'rodadas')}
                 if item['estado'] in ACTIVE and not self.contexts.get(meta['id'], {}).get('busy'):
@@ -168,11 +170,18 @@ class Conversas:
                                      rodadas=selected.get('rodadas', []) if selected else None)
             return {'estado': 'excluido', 'item': item}
 
-    def eventos(self, identifier, after=0, wait=0):
+    def _conferir_dono(self, identifier, dono):
+        """In pilot mode a guest only reaches conversations created with its own invitation."""
+        ctx = self._get(identifier)
+        if dono is not None and ctx['meta'].get('dono') != dono:
+            raise ValueError('Conversa indisponível para este acesso.')
+        return ctx
+
+    def eventos(self, identifier, after=0, wait=0, dono=None):
         if type(after) is not int or after < 0 or type(wait) is not int or not 0 <= wait <= 20:
             raise ValueError('Cursor/espera inválidos.')
         with self.condition:
-            ctx = self._get(identifier)
+            ctx = self._conferir_dono(identifier, dono)
             if after > len(ctx['events']):
                 raise ValueError('Cursor posterior ao histórico.')
             if after == len(ctx['events']) and ctx['meta']['estado'] in ACTIVE and wait:
@@ -273,7 +282,7 @@ class Conversas:
             return {'caso': case, 'conversa': identifier,
                     'conteudo': self._caderno(case, data.get('selecoes'), ctx, evolution, module)}
 
-    def perguntar(self, data):
+    def perguntar(self, data, dono=None):
         question, case = data.get('pergunta'), data.get('caso')
         if not isinstance(question, str) or not 1 <= len(question.strip()) <= 16000:
             raise ValueError('Informe uma pergunta de até 16000 caracteres.')
@@ -292,7 +301,7 @@ class Conversas:
                 if feedback['conversa'] != identifier:
                     raise ValueError('As observações pertencem a outra conversa. Use Continuar com estas observações.')
             if identifier:
-                ctx = self._get(identifier)
+                ctx = self._conferir_dono(identifier, dono)
                 if ctx['meta']['caso'] != case:
                     raise ValueError('Conversa pertence a outro caso; abra uma nova conversa.')
             else:
@@ -304,7 +313,7 @@ class Conversas:
                 ctx = {'meta': {'id': identifier, 'caso': case, 'titulo': question[:120],
                        'corpus_id': inventory['corpus_id'], 'criada_em_utc': agora(),
                        'estado': 'pronto', 'thread_id': None, 'rodadas': [], 'turn_id': None,
-                       'modelo': None, 'politica': 'read-only; on-request; sem web/conectores/shell'},
+                       'modelo': None, 'dono': dono, 'politica': 'read-only; on-request; sem web/conectores/shell'},
                        'events': [], 'busy': False}
                 self.contexts[identifier] = ctx
                 if feedback:
@@ -788,9 +797,9 @@ class Conversas:
         self._event(identifier, 'aviso', {'mensagem': f'Solicitação não suportada recusada: {seguro(method)}'})
         self._reject_unknown(message)
 
-    def cancelar(self, identifier):
+    def cancelar(self, identifier, dono=None):
         with self.lock:
-            ctx = self._get(identifier)
+            ctx = self._conferir_dono(identifier, dono)
             if ctx['meta']['estado'] not in ACTIVE:
                 return {'estado': ctx['meta']['estado']}
             ctx['cancel'] = True
@@ -930,8 +939,8 @@ class Conversas:
             self.contexts[identifier]['pipeline'].observed('leitura', hit['referencia'])
         self._event(identifier, 'fonte', hit)
 
-    def fonte(self, identifier, reference):
-        self._get(identifier)
+    def fonte(self, identifier, reference, dono=None):
+        self._conferir_dono(identifier, dono)
         if not isinstance(reference, str) or not re.fullmatch(r'[a-f0-9]{64}', reference):
             raise ValueError('Referência inválida.')
         hit = next((e['dados'] for e in reversed(self.contexts[identifier]['events'])

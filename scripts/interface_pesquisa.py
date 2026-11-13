@@ -31,6 +31,7 @@ import exportar_apuracao
 import diligencias
 from codex_apuracao import Conversas
 from inferencia_api import resumo_inferencia, salvar_inferencia
+import acesso
 import lixeira
 from indice_sqlite import (ID_CASO, ID_RODADA, ID_GERACAO, caminho_rodada,
                            cobertura, ler_passagem, pesquisar)
@@ -43,6 +44,11 @@ DILIGENCIAS_OPERACOES = ('diligencias-listar', 'diligencias-criar', 'diligencias
                         'diligencias-responder', 'diligencias-original')
 # Provider choice and API key; the key is write-only from the browser's point of view.
 IA_OPERACOES = ('ia-config', 'ia-config-salvar')
+# Pilot mode: invitations (admin only) and what an invited guest may call.
+ACESSO_OPERACOES = ('acesso-listar', 'acesso-criar', 'acesso-revogar')
+OPERACOES_CONVIDADO = ('codex-status', 'codex-listar', 'codex-perguntar', 'codex-eventos', 'codex-cancelar',
+                       'codex-original', 'sessao-sair')
+COOKIE_PILOTO = 'vlado_sessao'
 
 
 def receber_documentos(root, data):
@@ -249,7 +255,15 @@ class Servidor(ThreadingHTTPServer):
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
         super().server_bind()
 
-    def __init__(self, address, root=ROOT):
+    def __init__(self, address, root=ROOT, modo='local', origem=None):
+        if modo not in ('local', 'piloto'):
+            raise ValueError('Modo inválido: use local ou piloto.')
+        if modo == 'piloto':
+            partes = urlsplit(origem or '')
+            if partes.scheme != 'https' or not partes.netloc or partes.path not in ('', '/') or partes.query:
+                raise ValueError('No modo piloto informe --origem com o endereço público HTTPS, ex.: https://vlado.example.org')
+        self.modo = modo
+        self.origem_publica = (origem or '').rstrip('/')
         self.root = Path(root).resolve()
         self.token = secrets.token_urlsafe(32)
         self.ambiente = diagnostico()
@@ -263,7 +277,11 @@ class Servidor(ThreadingHTTPServer):
 
     @property
     def origin(self):
-        return f'http://127.0.0.1:{self.server_port}'
+        return self.origem_publica if self.modo == 'piloto' else f'http://127.0.0.1:{self.server_port}'
+
+    @property
+    def host_permitido(self):
+        return urlsplit(self.origem_publica).netloc if self.modo == 'piloto' else f'127.0.0.1:{self.server_port}'
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -275,6 +293,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; frame-src 'self' blob:; img-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'none'")
         self.send_header('Referrer-Policy', 'no-referrer')
+        if self.server.modo == 'piloto':
+            self.send_header('Strict-Transport-Security', 'max-age=31536000')
         for key, value in (extra or {}).items():
             self.send_header(key, value)
         try:
@@ -289,15 +309,63 @@ class Handler(BaseHTTPRequestHandler):
         self._send(status, json.dumps(value, ensure_ascii=False).encode('utf-8'))
 
     def _allowed(self):
-        if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}':
+        if urlsplit(self.path).path == '/saude':
+            return True  # container healthcheck reaches the server by its internal address
+        if self.headers.get('Host') != self.server.host_permitido:
             self._json(403, {'erro': 'Endereço não autorizado.'})
             return False
         return True
+
+    def _sessao_piloto(self):
+        cookie = SimpleCookie()
+        try:
+            cookie.load(self.headers.get('Cookie', ''))
+        except Exception:  # noqa: BLE001 - malformed cookie header means no session
+            return None, None
+        morsel = cookie.get(COOKIE_PILOTO)
+        sid = morsel.value if morsel else None
+        return (acesso.sessao(self.server.root, sid), sid) if sid else (None, None)
+
+    def _principal(self):
+        """Who is calling: in local mode the single operator (admin); in pilot mode the invitation session."""
+        if self.server.modo == 'local':
+            return {'papel': 'admin', 'convite': None, 'casos': None, 'csrf': self.server.token}
+        return self._sessao_piloto()[0]
+
+    def _proibido(self, mensagem='Operação não permitida para este acesso.'):
+        self._json(403, {'estado': 'proibido', 'erro': mensagem})
+
+    def _sem_convite(self):
+        texto = ('Acesso somente por convite. Abra o link que você recebeu. / '
+                 'Access by invitation only. Open the link you received.')
+        self._send(401, f'<!doctype html><meta charset="utf-8"><title>Vlado</title><p>{texto}</p>'.encode('utf-8'),
+                   'text/html; charset=utf-8')
+
+    def _aceitar_convite(self, token):
+        try:
+            sid, _ = acesso.aceitar(self.server.root, token)
+        except ValueError as exc:
+            self._send(403, f'<!doctype html><meta charset="utf-8"><title>Vlado</title><p>{exc}</p>'.encode('utf-8'),
+                       'text/html; charset=utf-8')
+            return
+        cookie = (f'{COOKIE_PILOTO}={sid}; HttpOnly; Secure; SameSite=Strict; Path=/; '
+                  f'Max-Age={acesso.SESSAO_HORAS * 3600}')
+        self._send(303, b'', 'text/plain; charset=utf-8', {'Location': '/', 'Set-Cookie': cookie})
 
     def do_GET(self):
         if not self._allowed():
             return
         path = urlsplit(self.path).path
+        if path == '/saude':
+            self._json(200, {'ok': True})
+            return
+        if self.server.modo == 'piloto':
+            if path.startswith('/convite/'):
+                self._aceitar_convite(path.removeprefix('/convite/'))
+                return
+            if path in ('/', '/api/catalogo') and self._principal() is None:
+                self._sem_convite()
+                return
         if path == '/api/integracao':
             self._json(200, {'codex': True, 'protocolo_interface': 1, 'gerenciamento': True,
                              'apresentacao_editorial': True, 'preparacao_pdfs': True,
@@ -306,7 +374,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == '/api/catalogo':
             try:
-                self._json(200, catalogo(self.server.root))
+                dados, principal = catalogo(self.server.root), self._principal()
+                if principal['casos'] is not None:
+                    dados = {'casos': [c for c in dados['casos'] if c['id'] in principal['casos']]}
+                self._json(200, dados)
             except (ValueError, OSError, KeyError) as exc:
                 self._json(400, {'erro': str(exc)})
             return
@@ -316,6 +387,7 @@ class Handler(BaseHTTPRequestHandler):
                   '/i18n.js': ('i18n.js', 'text/javascript; charset=utf-8'),
                   '/i18n_en.js': ('i18n_en.js', 'text/javascript; charset=utf-8'),
                   '/configuracao_ia.js': ('configuracao_ia.js', 'text/javascript; charset=utf-8'),
+                  '/piloto.js': ('piloto.js', 'text/javascript; charset=utf-8'),
                   '/gerenciar.js': ('gerenciar.js', 'text/javascript; charset=utf-8'),
                   '/leitura.js': ('leitura.js', 'text/javascript; charset=utf-8'),
                   '/experiencia.js': ('experiencia.js', 'text/javascript; charset=utf-8'),
@@ -342,9 +414,14 @@ class Handler(BaseHTTPRequestHandler):
         name, content_type = assets[path]
         content = (ASSETS / name).read_bytes()
         if name == 'index.html':
-            content = (content.replace(b'__SESSION_TOKEN__', self.server.token.encode('ascii'))
-                       .replace(b'__IDIOMA_PADRAO__', b'pt').replace(b'__PAPEL__', b'admin'))
-            self._send(200, content, content_type, {'Set-Cookie': f'apuracao_session={self.server.token}; HttpOnly; SameSite=Strict; Path=/'})
+            principal = self._principal()
+            piloto = self.server.modo == 'piloto'
+            content = (content.replace(b'__SESSION_TOKEN__', principal['csrf'].encode('ascii'))
+                       .replace(b'__IDIOMA_PADRAO__', b'en' if piloto else b'pt')
+                       .replace(b'__PAPEL__', principal['papel'].encode('ascii'))
+                       .replace(b'__MODO__', self.server.modo.encode('ascii')))
+            extra = {} if piloto else {'Set-Cookie': f'apuracao_session={self.server.token}; HttpOnly; SameSite=Strict; Path=/'}
+            self._send(200, content, content_type, extra)
         else:
             self._send(200, content, content_type)
 
@@ -364,8 +441,14 @@ class Handler(BaseHTTPRequestHandler):
             return
         if not self._allowed():
             return
-        if (self.headers.get('Origin', self.server.origin) != self.server.origin
-                or not secrets.compare_digest(self.headers.get('X-Session-Token', '').encode('utf-8'), self.server.token.encode('ascii'))
+        principal = self._principal()
+        if principal is None:
+            self._json(401, {'estado': 'sem_sessao', 'erro': 'Sessão expirada ou convite revogado. Abra novamente o link do convite.'})
+            return
+        # Pilot mode requires an explicit Origin; local mode keeps accepting same-origin requests without it.
+        origem = self.headers.get('Origin', None if self.server.modo == 'piloto' else self.server.origin)
+        if (origem != self.server.origin
+                or not secrets.compare_digest(self.headers.get('X-Session-Token', '').encode('utf-8'), principal['csrf'].encode('ascii'))
                 or self.headers.get_content_type() != 'application/json'):
             self._json(403, {'erro': 'Origem ou sessão não autorizada. Recarregue a página.'})
             return
@@ -376,7 +459,7 @@ class Handler(BaseHTTPRequestHandler):
                             'codex-desligar', 'codex-observacoes', 'codex-corpus-previa', 'codex-documentos-cadastrar', 'codex-caderno-previa', 'codex-diligencias-previa')
         if operation not in (*codex_operations, *apuracao.OPERACOES, *CADERNO_OPERACOES, *DILIGENCIAS_OPERACOES, 'analises', 'buscar', 'ler', 'cobertura', 'original', 'cadastrar', 'inventario',
                              'ambiente', 'preparar-pdfs',
-                             'gerenciar-listar', 'excluir', 'restaurar', *IA_OPERACOES,
+                             'gerenciar-listar', 'excluir', 'restaurar', *IA_OPERACOES, *ACESSO_OPERACOES, 'sessao-sair',
                              'achados-revisao-salvar',
                              'achados-catalogo', 'achados-buscar', 'achados-detalhe',
                              'achados-evidencia', 'achados-original', 'achados-exportar', 'achados-briefing'):
@@ -386,6 +469,21 @@ class Handler(BaseHTTPRequestHandler):
             data = json.loads(body)
             if not isinstance(data, dict):
                 raise ValueError('Requisição deve ser um objeto JSON.')
+            negado = self._negado(operation, data, principal)
+            if negado:
+                self._proibido(negado)
+                return
+            dono = principal['convite'] if principal['papel'] != 'admin' else None
+            if operation == 'sessao-sair':
+                acesso.encerrar(self.server.root, self._sessao_piloto()[1])
+                self._send(200, b'{"estado": "encerrada"}', extra={
+                    'Set-Cookie': f'{COOKIE_PILOTO}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'})
+                return
+            if operation in ACESSO_OPERACOES:
+                self._json(200, self._acesso(operation, data))
+                return
+            if operation == 'codex-perguntar' and dono is not None:
+                acesso.registrar_consulta(self.server.root, dono)
             if operation == 'ambiente':
                 result = self.server.ambiente
             elif operation == 'ia-config':
@@ -436,16 +534,16 @@ class Handler(BaseHTTPRequestHandler):
                     threading.Thread(target=self.server.shutdown, daemon=True).start()
                     return
                 if operation == 'codex-original':
-                    path = manager.fonte(data.get('conversa'), data.get('referencia'))
+                    path = manager.fonte(data.get('conversa'), data.get('referencia'), dono=dono)
                     self._send(200, path.read_bytes(), 'application/octet-stream',
                                {'Content-Disposition': f'attachment; filename="original{path.suffix}"'})
                     return
                 if operation == 'codex-status':
                     result = manager.status()
                 elif operation == 'codex-listar':
-                    result = manager.listar(data.get('caso'))
+                    result = manager.listar(data.get('caso'), dono=dono)
                 elif operation == 'codex-perguntar':
-                    result = manager.perguntar(data)
+                    result = manager.perguntar(data, dono=dono)
                 elif operation == 'codex-observacoes':
                     result = manager.observacoes(data)
                 elif operation == 'codex-corpus-previa':
@@ -460,9 +558,9 @@ class Handler(BaseHTTPRequestHandler):
                         result = receber_documentos(self.server.root, {'caso': data.get('caso'),
                             'arquivos': data.get('arquivos'), 'natureza': data.get('natureza', 'nao_informada')})
                 elif operation == 'codex-eventos':
-                    result = manager.eventos(data.get('conversa'), data.get('cursor', 0), data.get('espera', 0))
+                    result = manager.eventos(data.get('conversa'), data.get('cursor', 0), data.get('espera', 0), dono=dono)
                 elif operation == 'codex-cancelar':
-                    result = manager.cancelar(data.get('conversa'))
+                    result = manager.cancelar(data.get('conversa'), dono=dono)
             else:
                 with self.server.cadastro_lock:
                     result = executar(self.server.root, operation, data)
@@ -477,6 +575,36 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, OSError, KeyError, TypeError, sqlite3.Error) as exc:
             self._json(400, {'estado': 'erro', 'erro': str(exc)})
 
+    def _negado(self, operation, data, principal):
+        """Authorization by role. Returns the refusal message, or None when allowed."""
+        if self.server.modo == 'piloto' and operation == 'codex-desligar':
+            return 'O serviço hospedado não pode ser encerrado pela interface.'
+        if operation in ACESSO_OPERACOES and self.server.modo != 'piloto':
+            return 'Convites só existem no modo piloto.'
+        if principal['papel'] == 'admin':
+            return None
+        if operation not in OPERACOES_CONVIDADO:
+            return 'Operação não permitida para convidados.'
+        if operation in ('codex-listar', 'codex-perguntar') and data.get('caso') not in (principal['casos'] or []):
+            return 'Apuração não liberada para este convite.'
+        if operation == 'codex-perguntar' and set(data) - {'caso', 'pergunta', 'conversa'}:
+            return 'Convidados enviam somente a pergunta e a conversa.'
+        return None
+
+    def _acesso(self, operation, data):
+        root = self.server.root
+        if operation == 'acesso-listar':
+            return {'convites': acesso.listar(root)}
+        if operation == 'acesso-revogar':
+            return {'convite': acesso.revogar(root, data.get('id'))}
+        casos = data.get('casos')
+        disponiveis = {c['id'] for c in catalogo(root)['casos']}
+        if not isinstance(casos, list) or not set(casos) <= disponiveis:
+            raise ValueError('Escolha apurações existentes para o convite.')
+        registro, token = acesso.criar_convite(root, data.get('nome'), casos=casos,
+                                               cota_diaria=data.get('cota_diaria', 20), dias=data.get('dias', 14))
+        return {'convite': registro, 'link': f'{self.server.origin}/convite/{token}'}
+
     def log_message(self, format, *args):
         # Do not print queries, source content or token to the terminal.
         return
@@ -487,11 +615,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--porta', type=int, default=8765)
     parser.add_argument('--sem-abrir', action='store_true')
+    parser.add_argument('--modo', choices=('local', 'piloto'), default='local',
+                        help='piloto: acesso por convite atrás de um proxy HTTPS (ver docs/IMPLANTACAO_PILOTO.md)')
+    parser.add_argument('--host', default='127.0.0.1', help='Endereço de escuta; no contêiner use 0.0.0.0')
+    parser.add_argument('--origem', help='Endereço público HTTPS do piloto, ex.: https://vlado.example.org')
     args = parser.parse_args()
-    with Servidor(('127.0.0.1', args.porta)) as server:
-        print(f'Pesquisa documental: {server.origin}', flush=True)
-        print('Encerre com Ctrl+C. A seleção na tela não altera o caso ativo no Codex.', flush=True)
-        if not args.sem_abrir:
+    if args.modo == 'local' and args.host != '127.0.0.1':
+        raise SystemExit('No modo local o servidor escuta somente em 127.0.0.1.')
+    with Servidor((args.host, args.porta), modo=args.modo, origem=args.origem) as server:
+        print(f'Mesa de apuração ({args.modo}): {server.origin}', flush=True)
+        print('Encerre com Ctrl+C.', flush=True)
+        if args.modo == 'local' and not args.sem_abrir:
             webbrowser.open(server.origin)
         try:
             server.serve_forever()

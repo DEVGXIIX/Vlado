@@ -26,13 +26,14 @@
   <script src="/diligencias.js" defer></script>
   <script src="/codex.js" defer></script>
   <script src="/configuracao_ia.js" defer></script>
+  <script src="/piloto.js" defer></script>
   <script src="/gerenciar.js" defer></script>
   <script src="/experiencia.js" defer></script>
   <script src="/desktop.js" defer></script>
 </head>
-<body data-idioma-padrao="__IDIOMA_PADRAO__" data-papel="__PAPEL__">
+<body data-idioma-padrao="__IDIOMA_PADRAO__" data-papel="__PAPEL__" data-modo="__MODO__">
   <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
-  <header class="app-header"><button id="mesa-menu" type="button" class="secondary" aria-label="Abrir navegação" aria-expanded="false" aria-controls="mesa-sidebar">☰</button><span class="brand mobile-brand">Vlado<span>.</span></span><label class="persistent-context"><span>APURAÇÃO ATUAL</span><select id="contexto-caso"><option value="">Escolha uma apuração</option></select></label><span id="mesa-versao" class="header-note">Documentos, achados e fontes</span><button id="mesa-idioma" class="secondary" type="button" translate="no" aria-label="Switch to English">English</button><button id="mesa-tema" class="secondary" type="button" aria-label="Ativar modo claro">Modo claro</button></header>
+  <header class="app-header"><button id="mesa-menu" type="button" class="secondary" aria-label="Abrir navegação" aria-expanded="false" aria-controls="mesa-sidebar">☰</button><span class="brand mobile-brand">Vlado<span>.</span></span><label class="persistent-context"><span>APURAÇÃO ATUAL</span><select id="contexto-caso"><option value="">Escolha uma apuração</option></select></label><span id="mesa-versao" class="header-note">Documentos, achados e fontes</span><button id="mesa-idioma" class="secondary" type="button" translate="no" aria-label="Switch to English">English</button><button id="mesa-sair" class="secondary" type="button" hidden>Sair</button><button id="mesa-tema" class="secondary" type="button" aria-label="Ativar modo claro">Modo claro</button></header>
   <div class="app-layout">
   <aside class="sidebar" id="mesa-sidebar">
     <a class="brand sidebar-brand" href="/?area=inicio" data-mesa-area="inicio">Vlado<span>.</span></a><p class="brand-sub">SUA MESA DE TRABALHO</p>
@@ -169,6 +170,20 @@
     </div>
     </section>
     <section id="area-gerenciar" aria-labelledby="gerenciar-titulo" hidden>
+      <div id="acesso-painel" class="panel" hidden>
+        <h2>Convites do piloto</h2>
+        <form id="acesso-form" class="ia-config" autocomplete="off">
+          <label>Nome do convidado<input id="acesso-nome" type="text" maxlength="120" required></label>
+          <label>Apurações liberadas<select id="acesso-casos" multiple size="4" required></select></label>
+          <label>Consultas por dia<input id="acesso-cota" type="number" min="1" max="500" value="20" required></label>
+          <label>Validade (dias)<input id="acesso-dias" type="number" min="1" max="365" value="14" required></label>
+          <div class="actions"><button type="submit">Criar convite</button></div>
+        </form>
+        <p id="acesso-link-aviso" class="small" hidden>Copie este link agora; ele não será mostrado de novo.</p>
+        <input id="acesso-link" type="text" readonly hidden translate="no">
+        <p id="acesso-mensagem" class="small" role="status" aria-live="polite"></p>
+        <ul id="acesso-lista" class="small"></ul>
+      </div>
       <div class="panel">
         <div class="section-heading"><div><p class="eyebrow">SEU ESPAÇO DE TRABALHO</p><h2 id="gerenciar-titulo">Apurações e conversas</h2></div><button id="gerenciar-atualizar" type="button" class="secondary">Atualizar lista</button></div>
         <p class="small">Exclua o que saiu da sua mesa. Os itens vão para a lixeira e podem ser restaurados; os arquivos continuam preservados no projeto.</p>
