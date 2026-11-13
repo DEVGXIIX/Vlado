@@ -41,7 +41,7 @@
         const block=element('section',undefined,'notebook-source');
         block.append(element('h4',`${Leitura.nome(source)} · ${source.localizador}`),element('blockquote',source.trecho),
           element('p',source.conferencia_textual==='literal_localizado'?'Trecho localizado no texto. Isso não valida a interpretação.':'Transcrição humana: o trecho não foi validado automaticamente pelo extrator.','small'));
-        const original=element('button','Conferir original','secondary'),feedback=element('p','','small');original.type='button';feedback.setAttribute('role','status');
+        const original=element('button',Leitura.rotuloOriginal(Leitura.pagina(source)),'secondary'),feedback=element('p','','small');original.type='button';feedback.setAttribute('role','status');
         original.addEventListener('click',async()=>{original.disabled=true;try{await window.abrirOriginal(await api('caderno-original',{caso:bundle.caso_id,registro_id:entry.id,sha256:item.sha256,fonte_indice:index},true),source.nome_documento,source.pagina_pdf);}catch(failure){feedback.textContent=failure.message;}finally{original.disabled=false;}});
         block.append(original,feedback);card.append(block);
       }
@@ -100,7 +100,7 @@
     $('caderno-documento').replaceChildren(...data.documentos.map(d=>new Option(Leitura.nome(d),d.documento_id)));
     if(selected&&data.documentos.some(d=>d.documento_id===selected))$('caderno-documento').value=selected;
     if(!data.documentos.length)throw new Error('Cadastre um documento antes de registrar uma passagem.');
-    if(!keep){$('caderno-trecho').value=prefill.trecho||'';$('caderno-pagina').value=prefill.pagina_pdf||'';$('caderno-localizador').value=prefill.localizador||'';$('caderno-titulo-input').value=Leitura.nome(sourceDoc())+' · trecho';}
+    if(!keep){$('caderno-trecho').value=prefill.trecho||'';$('caderno-pagina').value=prefill.pagina_pdf||'';$('caderno-localizador').value=prefill.localizador||'';$('caderno-titulo-input').value=Leitura.nome(sourceDoc())+' · trecho';originalLabel();}
     $('caderno-escopo').textContent=`Apuração selecionada · ${data.corpus_id}${data.rodada?' · fonte da rodada '+data.rodada:' · documentos cadastrados'}`;
     ready=true;formControls();
   }
@@ -118,7 +118,10 @@
   $('caderno-fechar').addEventListener('click',()=>{if(!saving)dialog.close();});
   dialog.addEventListener('cancel',event=>{if(saving)event.preventDefault();});
   dialog.addEventListener('close',()=>{++dialogVersion;session=null;ready=false;});
-  $('caderno-documento').addEventListener('change',()=>{$('caderno-trecho').value='';$('caderno-pagina').value='';$('caderno-localizador').value='';$('caderno-manual').checked=false;formControls();});
+  // The original opens at the page typed in the form; the label says which.
+  function originalLabel(){$('caderno-original').textContent=Leitura.rotuloOriginal(Leitura.pagina({pagina_pdf:$('caderno-pagina').value}));}
+  $('caderno-pagina').addEventListener('input',originalLabel);
+  $('caderno-documento').addEventListener('change',()=>{$('caderno-trecho').value='';$('caderno-pagina').value='';$('caderno-localizador').value='';$('caderno-manual').checked=false;originalLabel();formControls();});
   $('caderno-tipo').addEventListener('change',formControls);
   $('caderno-fontes-atualizar').addEventListener('click',async()=>{formError();try{await loadDocuments({},true);}catch(failure){formError(failure.message);}});
   $('caderno-original').addEventListener('click',async()=>{

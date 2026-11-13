@@ -2,6 +2,21 @@
 (() => {
   const dialog = $('revisao-dialogo');
   let session = null, sequence = 0, saving = false, ready = false;
+  // "Checked in the original" waits until each cited original was opened in this page.
+  // A screen-side reminder only: the server does not record it.
+  const openedOriginals = new Set();
+  const evidenceKey = (scope, id) => [scope.caso, scope.rodada, scope.revisao, id].join('/');
+  function guard() {
+    const option = $('revisao-estado').querySelector('[value="conferida_no_original"]');
+    const missing = session ? session.evidences.filter(e => !openedOriginals.has(evidenceKey(session.scope, e.id))).length : 0;
+    option.disabled = !session?.sourcesReady || missing > 0;
+    $('revisao-guarda').hidden = !session?.sourcesReady || !missing;
+    $('revisao-guarda').textContent = `Para marcar “Conferida no original”, abra o original de cada trecho citado (${missing === 1 ? 'falta 1' : `faltam ${missing}`}).`;
+  }
+  window.registrarOriginalConferido = (scope, evidenceId) => {
+    openedOriginals.add(evidenceKey(scope, evidenceId));
+    if (session) guard();
+  };
   function fail(message = '') {
     $('revisao-erro').textContent = message; $('revisao-erro').hidden = !message;
   }
@@ -25,7 +40,7 @@
   window.conferirAchado = async (item, scope, version) => {
     if (saving) return;
     const request = ++sequence;
-    ready = false; session = null; fail(); controls();
+    ready = false; session = null; fail(); controls(); guard();
     $('revisao-afirmacao').textContent = item.redacao;
     $('revisao-fontes').replaceChildren(element('p', 'Abrindo os trechos citados…', 'small'));
     $('revisao-situacao').textContent = 'Carregando a marcação atual e as fontes.';
@@ -36,12 +51,12 @@
       const detail = await api('achados-detalhe', {...scope, achado_id:item.id});
       if (request !== sequence || !dialog.open) return;
       const claim = detail.achado, mark = claim.revisao_humana;
-      session = {scope:{...scope}, version, item:claim, mark, hash:detail.registros_sha256};
+      const evidences = claim.evidencias.filter(e => claim.vinculos.some(link => link.evidencia_id === e.id));
+      session = {scope:{...scope}, version, item:claim, mark, hash:detail.registros_sha256, evidences, sourcesReady:false};
       $('revisao-afirmacao').textContent = claim.redacao;
       $('revisao-estado').value = mark.estado; $('revisao-observacao').value = mark.observacao;
       describe(); history(mark);
       $('revisao-fontes').replaceChildren();
-      const evidences = claim.evidencias.filter(e => claim.vinculos.some(link => link.evidencia_id === e.id));
       if (!evidences.length) $('revisao-fontes').append(element('p', 'Este achado não tem trechos vinculados nesta revisão. Você pode registrar uma pendência, um ajuste ou suporte insuficiente.', 'notice'));
       const loaded = await Promise.allSettled(evidences.map(async evidence => {
         const block = element('article', undefined, 'review-evidence');
@@ -51,12 +66,14 @@
           element('blockquote', evidence.trecho || 'Leitura visual registrada; consulte o original.'),
           element('p', evidence.contexto, 'small'));
         const feedback = element('p', '', 'small'); feedback.setAttribute('role', 'status');
-        const original = element('button', 'Conferir original', 'secondary'); original.type = 'button';
+        const page = Leitura.pagina(evidence);
+        const original = element('button', Leitura.rotuloOriginal(page)); original.type = 'button';
         original.addEventListener('click', async () => {
           original.disabled = true;
           try {
             const blob = await api('achados-original', {...scope, evidencia_id:evidence.id}, true);
-            await window.abrirOriginal(blob, evidence.original.split('/').pop(),evidence.pagina_pdf || evidence.localizador?.pagina_pdf, claim.redacao + '\n\n' + (evidence.trecho || 'Fonte visual: confira o original.'));
+            await window.abrirOriginal(blob, evidence.original.split('/').pop(), page, claim.redacao + '\n\n' + (evidence.trecho || 'Fonte visual: confira o original.'));
+            window.registrarOriginalConferido(scope, evidence.id);
           } catch (error) { feedback.textContent = error.message; }
           finally { original.disabled = false; }
         });
@@ -77,8 +94,8 @@
       }));
       if (request !== sequence || !dialog.open) return;
       ready = true; controls();
-      const canConfirm = evidences.length > 0 && loaded.every(result => result.status === 'fulfilled');
-      $('revisao-estado').querySelector('[value="conferida_no_original"]').disabled = !canConfirm;
+      session.sourcesReady = evidences.length > 0 && loaded.every(result => result.status === 'fulfilled');
+      guard();
       $('revisao-situacao').textContent = 'A marcação vale para este achado, nesta revisão. O texto da IA será preservado.';
     } catch (error) {
       if (request === sequence && dialog.open) { fail(error.message); $('revisao-situacao').textContent = 'Não foi possível abrir a conferência.'; }
@@ -88,7 +105,7 @@
   $('revisao-observacao').addEventListener('input', describe);
   $('revisao-fechar').addEventListener('click', () => { if (!saving) dialog.close(); });
   dialog.addEventListener('cancel', event => { if (saving) event.preventDefault(); });
-  dialog.addEventListener('close', () => { ++sequence; session = null; ready = false; });
+  dialog.addEventListener('close', () => { ++sequence; session = null; ready = false; guard(); });
   $('revisao-form').addEventListener('submit', async event => {
     event.preventDefault(); if (!session || !ready || saving) return;
     const captured = session;

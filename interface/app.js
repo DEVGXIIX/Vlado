@@ -189,7 +189,7 @@ function renderHit(hit, scope, version) {
     element('pre', hit.trecho));
   const actions = element('div', undefined, 'actions');
   const contextButton = element('button', 'Ver contexto completo', 'secondary');
-  const originalButton = element('button', 'Conferir original', 'secondary');
+  const originalButton = element('button', Leitura.rotuloOriginal(Leitura.pagina(hit)), 'secondary');
   const copy = element('button', 'Copiar referência', 'secondary');
   const context = element('div', undefined, 'context'); context.hidden = true;
   const feedback = element('p', '', 'small'); feedback.setAttribute('role', 'status');
@@ -714,29 +714,87 @@ function renderFindingChoice(item, scope, version) {
   if (choice) row.append(choice);
   return row;
 }
+// Quote, locator and the original page lead each evidence; provenance details follow.
+function renderEvidence(item, link, scope, version) {
+  const ev = item.evidencias.find(e => e.id === link.evidencia_id);
+  const block = element('section', undefined, 'evidence');
+  const loc = ev.localizador, page = Leitura.pagina(ev);
+  const position = `${loc.pagina_pdf ? `Página PDF ${loc.pagina_pdf} · ` : ''}${loc.tipo === 'linhas' ? `Linhas ${loc.linha_inicio}–${loc.linha_fim}` : loc.descricao || loc.tipo}`;
+  const quote = element('blockquote', ev.trecho || 'Sem transcrição literal; leitura visual registrada.');
+  const actions = element('div', undefined, 'actions'), feedback = element('p', '', 'small');
+  feedback.setAttribute('role','status');
+  const context = element('div', undefined, 'context'); context.hidden = true;
+  const original = element('button', Leitura.rotuloOriginal(page)); original.type = 'button';
+  original.addEventListener('click', async () => {
+    original.disabled = true;
+    try {
+      const blob = await api('achados-original', {...scope, evidencia_id:ev.id}, true);
+      if (version !== findingEpoch) return;
+      await window.abrirOriginal(blob, ev.original.split('/').pop(), page, item.redacao + '\n\n' + (ev.trecho || 'Fonte visual: confira o original.'));
+      window.registrarOriginalConferido?.(scope, ev.id);
+    } catch (failure) { if (version === findingEpoch) feedback.textContent = failure.message; }
+    finally { if (version === findingEpoch) original.disabled = false; }
+  });
+  const view = element('button', 'Ver contexto', 'secondary'); view.type = 'button';
+  view.disabled = ev.modo === 'visual';
+  view.addEventListener('click', async () => {
+    view.disabled = true;
+    try {
+      const result = await api('achados-evidencia', {...scope, evidencia_id:ev.id});
+      if (version !== findingEpoch) return;
+      context.replaceChildren(element('p', result.aviso), ...(result.contexto || []).map(l => element('p', `L${l.linha} ${l.texto}`)));
+      context.hidden = false;
+    } catch (failure) { if (version === findingEpoch) feedback.textContent = failure.message; }
+    finally { if (version === findingEpoch) view.disabled = false; }
+  });
+  const reference = `${scope.caso}/${scope.rodada}/${scope.revisao}/${item.id}@v${item.versao} · ${ev.id} · ${ev.documento_id}\n${position}\nOriginal: ${ev.original}\nSHA-256: ${ev.original_sha256}\nFonte textual: ${ev.fonte_textual || 'indisponível'} · SHA-256: ${ev.fonte_sha256 || 'não se aplica'}\nÍndice documental: ${JSON.stringify(ev.indice)}\n${ev.trecho}`;
+  const copy = element('button','Copiar referência completa','secondary'); copy.type = 'button';
+  copy.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(reference); if (version === findingEpoch) feedback.textContent = 'Referência copiada.'; }
+    catch { if (version === findingEpoch) feedback.textContent = reference; }
+  });
+  const notebook=element('button','Registrar trecho com fonte','secondary');notebook.type='button';
+  notebook.addEventListener('click',()=>window.abrirRegistroCaderno({caso:scope.caso,rodada:scope.rodada,
+    documento_id:ev.documento_id,pagina_pdf:ev.localizador.pagina_pdf,
+    localizador:ev.localizador.descricao||(ev.localizador.linha_inicio?`Linhas ${ev.localizador.linha_inicio}–${ev.localizador.linha_fim}`:''),
+    trecho:window.trechoSelecionadoCaderno(quote,ev.trecho)}));
+  actions.append(original,view,copy,notebook);
+  if(ev.trecho)actions.append(window.botaoAdicionarApuracao({...scope,tipo:'ia',achado_id:item.id,achado_versao:item.versao,evidencia_id:ev.id},quote,ev.trecho));
+  block.append(element('h4', Leitura.fonte({...ev, ...loc})), quote, actions, context, feedback,
+    element('p', `${pretty(link.papel)} · ${link.justificativa}`, 'small'));
+  if (ev.modo === 'visual') block.append(element('p', 'Contexto textual indisponível; consulte o original.', 'small'));
+  if (ev.limitacoes) block.append(element('p', `Limitações da evidência: ${ev.limitacoes}`, 'small'));
+  const metadata = element('details',undefined,'evidence-details');
+  metadata.append(element('summary','Atribuição e contexto da fonte'),element('p',`Atribuição: ${ev.atribuicao} · Contexto: ${ev.contexto}`,'small'));
+  block.append(metadata, Leitura.tecnicos(`${ev.id} · ${ev.documento_id} · ${position} · Original: ${ev.original} · SHA-256: ${ev.original_sha256}`));
+  return block;
+}
 function renderFinding(item, scope, version, allowBriefing = true) {
   const card = element('article', undefined, 'finding-detail');
   card.id = item.id;
   const statuses = element('div',undefined,'claim-status');
-  statuses.append(supportBadge(item),humanReviewBadge(item),element('p',`Destino editorial: ${pretty(item.destino)}`,'meta'));
-  card.append(element('p',pretty(item.natureza),'eyebrow'),element('h3',item.redacao),
-    Leitura.tecnicos(`${scope.caso}/${scope.rodada}/${scope.revisao} · consulta ${scope.geracao_achados} · ${item.id}@v${item.versao}`),statuses,
-    element('p', `Pergunta relacionada: ${item.subquestao}`),
-    element('p', `Verificação externa: ${pretty(item.verificacao_externa.estado)} · ${item.verificacao_externa.limitacao}`, 'small'));
+  statuses.append(element('span',pretty(item.natureza),'meta claim-nature'),supportBadge(item),humanReviewBadge(item));
+  card.append(element('h3',item.redacao),statuses,
+    element('h4',item.vinculos.length ? 'Onde está o suporte e o contexto' : 'Sem evidência vinculada a esta redação'));
+  for (const link of item.vinculos) card.append(renderEvidence(item, link, scope, version));
   if (item.limitacoes) card.append(element('p', `Limitações: ${item.limitacoes}`, 'limitation'));
+  const actions = element('div', undefined, 'actions finding-actions');
   const review = element('button','Conferir','secondary'); review.type = 'button';
   review.addEventListener('click', () => window.conferirAchado(item,scope,version));
-  card.append(review);
-  card.append(window.botaoAdicionarApuracao({...scope,tipo:'ia',achado_id:item.id,achado_versao:item.versao},card.querySelector('h3'),item.redacao));
   const followup=element('button','Criar diligência','secondary');followup.type='button';
   followup.addEventListener('click',()=>window.abrirDiligencia({caso:scope.caso,redacao:item.redacao,
     origem:{tipo:'ia',rodada:scope.rodada,revisao:scope.revisao,registros_sha256:findingResult.registros_sha256,
-      achado_id:item.id,achado_versao:item.versao}}));card.append(followup);
+      achado_id:item.id,achado_versao:item.versao}}));
+  actions.append(review,window.botaoAdicionarApuracao({...scope,tipo:'ia',achado_id:item.id,achado_versao:item.versao},card.querySelector('h3'),item.redacao),followup);
+  card.append(actions);
   if (item.revisao_humana?.observacao) card.append(element('p', `Observação do jornalista: ${item.revisao_humana.observacao}`, 'human-review-note'));
   if (item.conferencia_humana === 'retorno_recebido') card.append(element('p','Há retorno humano anterior nos registros; consulte seu alcance no histórico.','small'));
   for (const h of item.historico.conferencias_humanas.filter(h => h.versao === item.versao)) {
     card.append(element('p',`Alcance do retorno humano: ${h.alcance} · Decisão: ${pretty(h.decisao)} · Retorno: ${h.retorno_literal_ou_referencia}`,'human-scope'));
   }
+  card.append(element('p', `Pergunta relacionada: ${item.subquestao}`, 'small'),
+    element('p',`Destino editorial: ${pretty(item.destino)}`,'small'),
+    element('p', `Verificação externa: ${pretty(item.verificacao_externa.estado)} · ${item.verificacao_externa.limitacao}`, 'small'));
   if (item.briefing) {
     card.append(element('p', 'Incluído no briefing.', 'small'));
     const artifact = findingResult?.artefatos.find(a => a.arquivo === item.briefing);
@@ -745,58 +803,7 @@ function renderFinding(item, scope, version, allowBriefing = true) {
       view.addEventListener('click',() => openBriefing(artifact,scope,version)); card.append(view);
     }
   }
-  card.append(element('h4',item.vinculos.length ? 'Onde está o suporte e o contexto' : 'Sem evidência vinculada a esta redação'));
-  for (const link of item.vinculos) {
-    const ev = item.evidencias.find(e => e.id === link.evidencia_id);
-    const block = element('section', undefined, 'evidence');
-    const loc = ev.localizador;
-    const position = `${loc.pagina_pdf ? `Página PDF ${loc.pagina_pdf} · ` : ''}${loc.tipo === 'linhas' ? `Linhas ${loc.linha_inicio}–${loc.linha_fim}` : loc.descricao || loc.tipo}`;
-    block.append(element('h4', Leitura.fonte({...ev, ...loc})),
-      element('p', `${pretty(link.papel)} · ${link.justificativa}`), element('blockquote', ev.trecho || 'Sem transcrição literal; leitura visual registrada.'),
-      Leitura.tecnicos(`${ev.id} · ${ev.documento_id} · ${position} · Original: ${ev.original} · SHA-256: ${ev.original_sha256}`));
-    if (ev.limitacoes) block.append(element('p', `Limitações da evidência: ${ev.limitacoes}`, 'small'));
-    const metadata = element('details',undefined,'evidence-details');
-    metadata.append(element('summary','Atribuição e contexto da fonte'),element('p',`Atribuição: ${ev.atribuicao} · Contexto: ${ev.contexto}`,'small'));
-    block.append(metadata);
-    const actions = element('div', undefined, 'actions'), feedback = element('p', '', 'small');
-    feedback.setAttribute('role','status');
-    const context = element('div', undefined, 'context'); context.hidden = true;
-    const view = element('button', 'Ver contexto', 'secondary'); view.type = 'button';
-    if (ev.modo === 'visual') { view.disabled = true; block.append(element('p', 'Contexto textual indisponível; consulte o original.', 'small')); }
-    view.addEventListener('click', async () => {
-      view.disabled = true;
-      try {
-        const result = await api('achados-evidencia', {...scope, evidencia_id:ev.id});
-        if (version !== findingEpoch) return;
-        context.replaceChildren(element('p', result.aviso), ...(result.contexto || []).map(l => element('p', `L${l.linha} ${l.texto}`)));
-        context.hidden = false;
-      } catch (failure) { if (version === findingEpoch) feedback.textContent = failure.message; }
-      finally { if (version === findingEpoch) view.disabled = false; }
-    });
-    const original = element('button', 'Conferir original', 'secondary'); original.type = 'button';
-    original.addEventListener('click', async () => {
-      original.disabled = true;
-      try {
-        const blob = await api('achados-original', {...scope, evidencia_id:ev.id}, true);
-        if (version === findingEpoch) await window.abrirOriginal(blob, ev.original.split('/').pop(), ev.pagina_pdf || ev.localizador?.pagina_pdf, item.redacao + '\n\n' + (ev.trecho || 'Fonte visual: confira o original.'));
-      } catch (failure) { if (version === findingEpoch) feedback.textContent = failure.message; }
-      finally { if (version === findingEpoch) original.disabled = false; }
-    });
-    const reference = `${scope.caso}/${scope.rodada}/${scope.revisao}/${item.id}@v${item.versao} · ${ev.id} · ${ev.documento_id}\n${position}\nOriginal: ${ev.original}\nSHA-256: ${ev.original_sha256}\nFonte textual: ${ev.fonte_textual || 'indisponível'} · SHA-256: ${ev.fonte_sha256 || 'não se aplica'}\nÍndice documental: ${JSON.stringify(ev.indice)}\n${ev.trecho}`;
-    const copy = element('button','Copiar referência completa','secondary'); copy.type = 'button';
-    copy.addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(reference); if (version === findingEpoch) feedback.textContent = 'Referência copiada.'; }
-      catch { if (version === findingEpoch) feedback.textContent = reference; }
-    });
-    const notebook=element('button','Registrar trecho com fonte','secondary');notebook.type='button';
-    notebook.addEventListener('click',()=>window.abrirRegistroCaderno({caso:scope.caso,rodada:scope.rodada,
-      documento_id:ev.documento_id,pagina_pdf:ev.localizador.pagina_pdf,
-      localizador:ev.localizador.descricao||(ev.localizador.linha_inicio?`Linhas ${ev.localizador.linha_inicio}–${ev.localizador.linha_fim}`:''),
-      trecho:window.trechoSelecionadoCaderno(block.querySelector('blockquote'),ev.trecho)}));
-    actions.append(view,original,copy,notebook);
-    if(ev.trecho)actions.append(window.botaoAdicionarApuracao({...scope,tipo:'ia',achado_id:item.id,achado_versao:item.versao,evidencia_id:ev.id},block.querySelector('blockquote'),ev.trecho));
-    block.append(actions,context,feedback); card.append(block);
-  }
+  card.append(Leitura.tecnicos(`${scope.caso}/${scope.rodada}/${scope.revisao} · consulta ${scope.geracao_achados} · ${item.id}@v${item.versao}`));
   const history = element('details',undefined,'history'), summary = element('summary','Detalhes técnicos e histórico');
   history.append(summary);
   for (const v of item.historico.versoes) history.append(element('p', `v${v.versao} · ${v.redacao} · ${pretty(v.natureza)} · ${v.limitacoes}`));

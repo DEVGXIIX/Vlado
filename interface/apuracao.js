@@ -29,7 +29,7 @@
         element('p',`${source.caso} / ${source.rodada}${source.achado_id?' / '+source.achado_id+' v'+source.achado_versao:''}`,'small'),element('blockquote',source.texto_selecionado));
       if(!source.documentos.length)block.append(element('p','Achado sem evidência documental vinculada.','small'));
       for(const [index,doc]of source.documentos.entries()){
-        const button=element('button','Abrir fonte original','secondary');button.type='button';
+        const button=element('button',Leitura.rotuloOriginal(Leitura.pagina(doc)),'secondary');button.type='button';
         block.append(element('p',`${doc.nome_documento} (${doc.documento_id}) · ${doc.pagina_pdf?'página PDF '+doc.pagina_pdf+' · ':''}${doc.localizador}`));
         button.addEventListener('click',async()=>{button.disabled=true;try{await window.abrirOriginal(await api('apuracao-original',{caso:state.caso,nota_id:note.id,fonte_id:source.id,documento_indice:index},true),doc.nome_documento,doc.pagina_pdf);}catch(failure){error(failure.message);}finally{button.disabled=false;}});
         block.append(button);

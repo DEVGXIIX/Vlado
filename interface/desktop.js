@@ -271,7 +271,7 @@
       contents.append(element('span',pdf?.paginas_pdf!=null?Leitura.quantidade(pdf.paginas_pdf,'página'):(doc.nome_recebido.split('.').pop()||'Arquivo').toUpperCase()));
       const badge=element('span',pdf?(limited?'Com limitação de extração':'Texto extraído'):'Original preservado',limited?'mesa-pill warning':'mesa-pill');coverage.append(badge);
       if(pdf)coverage.append(element('small',extractionMessage(pdf)));
-      const open=element('button','Conferir original','secondary');open.type='button';open.addEventListener('click',()=>openDocument(doc,open));actions.append(open);
+      const open=element('button',Leitura.rotuloOriginal(null),'secondary');open.type='button';open.addEventListener('click',()=>openDocument(doc,open));actions.append(open);
       row.append(name,contents,coverage,actions);tbody.append(row);
     }
     table.append(tbody);wrapper.append(table);target.append(wrapper);

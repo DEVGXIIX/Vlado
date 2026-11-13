@@ -379,10 +379,11 @@ function criarMesa({url = 'http://127.0.0.1:8765/', papel = 'admin', modo = 'loc
     .replace('__SESSION_TOKEN__', 'teste').replace('__PAPEL__', papel).replace('__MODO__', modo)
     .replace('__IDIOMA_PADRAO__', idioma), doc);
   const guardado = new Map(Object.entries(armazenamento));
+  class URLMesa extends URL { static createObjectURL() { return 'blob:teste'; } static revokeObjectURL() {} }
   const chamadas = [];
   const localizacao = new URL(url);
   const janela = {
-    document: doc, console, Map, Set, WeakMap, Promise, JSON, Math, Date, Intl, URL, Proxy, Reflect, Symbol, Array, Object,
+    document: doc, console, Map, Set, WeakMap, Promise, JSON, Math, Date, Intl, URL: URLMesa, URLSearchParams, Proxy, Reflect, Symbol, Array, Object,
     String, Number, Boolean, RegExp, Error, TypeError, structuredClone, setTimeout, clearTimeout, setInterval, clearInterval,
     queueMicrotask, Blob: class { constructor(partes = [], opcoes = {}) { this.partes = partes; this.type = opcoes.type || ''; } async text() { return this.partes.join(''); } },
     Event: Evento, CustomEvent: Evento, NodeFilter: {SHOW_ELEMENT: 1, SHOW_TEXT: 4},

@@ -2,6 +2,7 @@
 (() => {
   let conversation = '', cursor = 0, view = 0, active = false, submitting = false;
   let inventoryVersion = 0, catalogVersion = 0, sourceMap = new Map(), messageMap = new Map();
+  const sourceChats = new Map();
   let currentStage = '';
   let currentGroup = null, currentRound = '', liveInventory = null, authenticated = null;
   let pendingFeedback = null;
@@ -126,7 +127,7 @@
     switchDraft($('codex-caso').value, '');
     currentStage = '';
     currentGroup = null; currentRound = ''; groups.clear(); frozenInventories.clear();
-    sourceMap.clear(); messageMap.clear();
+    sourceMap.clear(); sourceChats.clear(); messageMap.clear();
     $('codex-conversa').value = '';
     for (const id of ['codex-mensagens','codex-fontes','codex-atividades']) $(id).replaceChildren();
     $('codex-versao-editorial').textContent='Nova conversa: os documentos atuais serão preservados ao enviar a pergunta.';
@@ -248,14 +249,18 @@
         pending.title = 'Esta referência não foi recuperada nesta rodada.';
         return pending;
       }
-      const link = element('a', Leitura.fonte(hit), 'source-citation');
-      link.href = '#fonte-' + reference;
-      link.addEventListener('click', event => {
-        event.preventDefault();
+      // The citation opens the cited page itself; the side card stays open for context.
+      const page = Leitura.pagina(hit);
+      const chip = element('button', page ? `p. ${page}` : Leitura.localizador(hit), 'source-citation');
+      chip.type = 'button'; chip.setAttribute('translate', 'yes');
+      const label = `${Leitura.rotuloOriginal(page)}: ${Leitura.nome(hit)}`;
+      chip.setAttribute('aria-label', label); chip.title = label;
+      chip.addEventListener('click', () => {
         const card = document.getElementById('fonte-' + reference);
-        if (card) { if($('codex-painel-fontes'))$('codex-painel-fontes').open=true; card.open = true; card.querySelector('blockquote').focus(); }
+        if (card) { if ($('codex-painel-fontes')) $('codex-painel-fontes').open = true; card.open = true; }
+        openOriginal(hit, chip);
       });
-      return link;
+      return chip;
     });
     record.raw.textContent = JSON.stringify({...record.metadata, rodada:record.round, texto_preservado:record.text}, null, 2);
   }
@@ -278,23 +283,26 @@
     messageText(record); limitations();
     if (!record.final && followUpdates) owner.progress.scrollTop = owner.progress.scrollHeight;
   }
+  async function openOriginal(hit, trigger) {
+    trigger.disabled = true;
+    try {
+      const blob = await api('codex-original', {conversa:sourceChats.get(hit.referencia), referencia:hit.referencia}, true);
+      await window.abrirOriginal(blob, hit.original.split('/').pop(), Leitura.pagina(hit), hit.trecho);
+    } catch (error) { fail(error.message); }
+    finally { trigger.disabled = false; }
+  }
   function source(hit, chatId) {
     if (sourceMap.has(hit.referencia)) return;
     const doc = frozenInventories.get(hit.rodada)?.documentos?.find(d => d.id === hit.documento_id);
     hit = {...hit, nome_documento:hit.nome_documento || doc?.nome_recebido || hit.original};
-    sourceMap.set(hit.referencia, hit);
+    sourceMap.set(hit.referencia, hit); sourceChats.set(hit.referencia, chatId);
     const card = element('details', undefined, 'codex-source');
     card.id = 'fonte-' + hit.referencia; card.tabIndex = -1;
     const quote = element('blockquote', hit.trecho); quote.tabIndex = -1;
     card.append(element('summary', Leitura.fonte(hit)), quote);
-    const button = element('button', 'Conferir original preservado', 'secondary');
+    const button = element('button', Leitura.rotuloOriginal(Leitura.pagina(hit)));
     button.type = 'button';
-    button.addEventListener('click', async () => {
-      try {
-        const blob = await api('codex-original', {conversa:chatId, referencia:hit.referencia}, true);
-        await window.abrirOriginal(blob, hit.original.split('/').pop(), hit.pagina_pdf, hit.trecho);
-      } catch (error) { fail(error.message); }
-    });
+    button.addEventListener('click', () => openOriginal(hit, button));
     const notebook=element('button','Registrar trecho com fonte','secondary');notebook.type='button';
     const caseId=$('codex-caso').value;
     notebook.addEventListener('click',()=>window.abrirRegistroCaderno({caso:caseId,rodada:hit.rodada,

@@ -38,6 +38,14 @@ window.Leitura = (() => {
   function fonte(hit) {
     return `${nome(hit)} · ${localizador(hit)}`;
   }
+  // PDF page cited by a source, when the record states one; never inferred.
+  function pagina(hit) {
+    const loc = hit.localizador && typeof hit.localizador === 'object' ? hit.localizador : {};
+    const page = Number(hit.pagina_pdf ?? loc.pagina_pdf);
+    return Number.isSafeInteger(page) && page > 0 ? page : null;
+  }
+  // One label for the action that opens the original, wherever it appears.
+  const rotuloOriginal = page => page ? `Ver página ${page} no original` : 'Abrir original';
   function tecnicos(...content) {
     const details = node('details', undefined, 'technical');
     details.append(node('summary', 'Detalhes técnicos'));
@@ -145,5 +153,5 @@ window.Leitura = (() => {
     }
     target.replaceChildren(fragment);
   }
-  return {nome, fonte, localizador, tecnicos, lacunas, markdown, quantidade};
+  return {nome, fonte, localizador, pagina, rotuloOriginal, tecnicos, lacunas, markdown, quantidade};
 })();

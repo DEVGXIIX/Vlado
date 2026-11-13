@@ -244,3 +244,16 @@ body[data-modo="piloto"] #codex-desligar{display:none}
 #acesso-link{width:100%;font-family:monospace}
 /* While "Conexão e opções" is open, the question composer must not cover the settings form. */
 #area-codex:has(#codex-conexao[open]) #codex-form{position:static;max-height:none}
+/* Citation chip: the cited page, one click from the original. Inline, so no 44px box. */
+.markdown-body .source-citation{display:inline;min-height:0;margin:0 1px;padding:1px 6px;font:600 14px/1.4 "Source Sans 3","Segoe UI",sans-serif;color:var(--green);background:var(--soft);border:1px solid var(--theme-accent-line,#96aa98);border-radius:4px;vertical-align:baseline;white-space:nowrap;cursor:pointer}
+.markdown-body .source-citation:hover{background:var(--theme-active,#e4e7dd);border-color:var(--green)}
+.markdown-body .source-citation:disabled{opacity:.7;cursor:progress}
+@media(pointer:coarse){.markdown-body .source-citation{padding:4px 8px}}
+.codex-source>button:not(.secondary){margin-right:6px}
+/* Finding detail: claim, verdicts, then the evidence; metadata trails. */
+.finding-detail>h3:first-child{margin-top:0}
+.finding-detail .claim-status{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 4px}
+.finding-detail .claim-nature{font-size:13px}
+.finding-detail>.actions.finding-actions{margin:20px 0 6px}
+.finding-detail>.small{margin:6px 0}
+.evidence .actions>button:first-child{font-size:13px}
