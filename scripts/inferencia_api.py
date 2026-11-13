@@ -27,6 +27,7 @@ MAX_TOKENS_PADRAO = 16000
 MAX_PASSOS = 60
 ESPERA_FERRAMENTA = 300
 ESPERA_ENCERRAMENTO = 15
+MAX_IMAGENS_CONTEXTO = 3
 VERSAO = 'api-1'
 HISTORICO = 'api_historico.json'
 
@@ -436,6 +437,7 @@ class ServidorAPI:
                 if thread.cancelar.is_set():
                     return 'interrupted'
                 thread.mensagens.append(self._ferramenta(thread, turno, chamada))
+                self._podar_imagens(thread)
         raise ErroIA(f'Limite de {MAX_PASSOS} passos por etapa atingido sem resposta final.', codigo='passos')
 
     def _ferramenta(self, thread, turno, chamada):
@@ -472,6 +474,18 @@ class ServidorAPI:
                 imagens.append(imagem)
         return {'papel': 'ferramenta', 'id': chamada['id'], 'texto': '\n'.join(textos),
                 'erro': not result.get('success', False), 'imagens': imagens}
+
+    @staticmethod
+    def _podar_imagens(thread):
+        """Keep only the most recent page images in the context sent to the provider (cost and size cap)."""
+        vistas = 0
+        for mensagem in reversed(thread.mensagens):
+            if mensagem.get('imagens'):
+                vistas += 1
+                if vistas > MAX_IMAGENS_CONTEXTO:
+                    mensagem['imagens'] = []
+                    mensagem['texto'] = (mensagem.get('texto') or '') + \
+                        '\n[imagem retirada do contexto para limitar o tamanho; releia a página se precisar dela]'
 
     @staticmethod
     def _fechar_chamadas(thread):

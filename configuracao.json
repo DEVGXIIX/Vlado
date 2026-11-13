@@ -8,6 +8,10 @@
   "provedor": "anthropic",
   "modelo_preferido": null,
   "max_tokens_saida": 16000,
+  "limites": {
+    "tokens_por_consulta": 3000000,
+    "tokens_por_dia": 30000000
+  },
   "modelo_observado": null,
   "busca": "sqlite_fts5_por_rodada_e_leitura_documental",
   "indice_sqlite": true,

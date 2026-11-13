@@ -229,6 +229,22 @@ class TurnoTest(Base):
         self.proxima('turn/completed')
 
 
+class ImagensTest(Base):
+    def test_historico_enviado_mantem_somente_as_imagens_mais_recentes(self):
+        roteiro = [Resposta('', ({'id': f'c{i}', 'nome': 'consultar_acervo', 'argumentos': {'acao': 'imagem'}},), {}, 'm')
+                   for i in range(5)]
+        self.provedor.roteiro = roteiro + [Resposta('Fim.', (), {}, 'm')]
+        self.turno(self.iniciar_thread())
+        for _ in range(5):
+            pedido = self.proxima('item/tool/call')
+            self.servidor.send({'id': pedido['id'], 'result': {'success': True, 'contentItems': [
+                {'type': 'inputImage', 'imageUrl': 'data:image/png;base64,QUJD'}]}})
+        self.proxima('turn/completed')
+        ultima = self.provedor.chamadas[-1]['historico']
+        com_imagem = [m['id'] for m in ultima if m.get('imagens')]
+        self.assertEqual(com_imagem, ['c2', 'c3', 'c4'])
+
+
 class PersistenciaTest(Base):
     def test_historico_persiste_sem_imagens_e_e_retomado_por_outro_processo(self):
         chamada = {'id': 'call-9', 'nome': 'consultar_acervo', 'argumentos': {'acao': 'imagem'}}
