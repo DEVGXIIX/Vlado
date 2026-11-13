@@ -266,8 +266,9 @@ window.exportarEditorial = (data, name, format = 'md') => {
   const scope=[data.caso_id || data.caso,data.rodada || data.rodada_atual,data.revisao || data.revisao_atual,data.geracao || data.geracao_achados].filter(Boolean).join(' / ');
   paragraph('Apuração e versão: '+scope);
   function source(item) {
-    lines.push('### '+safe(Leitura.fonte(item)),'');quote(item.trecho);
-    paragraph('Referência: '+[scope,item.documento_id,item.referencia || item.referencia_atual || item.id,Leitura.localizador(item)].filter(Boolean).join(' · '));
+    // Exported records keep one language (Portuguese), whatever the screen shows.
+    lines.push('### '+safe(Leitura.fonte(item,'pt')),'');quote(item.trecho);
+    paragraph('Referência: '+[scope,item.documento_id,item.referencia || item.referencia_atual || item.id,Leitura.localizador(item,'pt')].filter(Boolean).join(' · '));
     paragraph('Original: '+(item.original || item.nome_documento || item.nome_recebido || 'Consulte o registro da fonte'));
     if(item.original_sha256)paragraph('SHA-256 do original: '+item.original_sha256);
     paragraph(item.contexto);paragraph(item.limitacoes);
@@ -277,7 +278,7 @@ window.exportarEditorial = (data, name, format = 'md') => {
     paragraph(`${items.length} registro(s) nesta exportação.`);
     for(const [index,raw]of items.entries()) {
       const item=raw.registro || raw;
-      lines.push('## '+safe(`${index+1}. ${item.redacao || item.titulo || Leitura.fonte(item)}`),'');
+      lines.push('## '+safe(`${index+1}. ${item.redacao || item.titulo || Leitura.fonte(item,'pt')}`),'');
       if(item.redacao || item.titulo) {
         if(item.autor)paragraph('Autoria: '+item.autor);
         if(item.suporte)paragraph('Suporte avaliado pela IA: '+pretty(item.suporte));

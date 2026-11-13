@@ -4,7 +4,9 @@
 // and the original Portuguese is kept so switching back restores it.
 (() => {
   const ATRIBUTOS = ['title', 'placeholder', 'aria-label', 'alt'];
-  const IGNORAR = '[translate="no"], blockquote, pre, code, .markdown-body, .vditor, [contenteditable="true"], textarea, script, style';
+  // Data containers. A textarea's text is its value, so only its attributes are chrome.
+  const DADOS = '[translate="no"], blockquote, pre, code, .markdown-body, .vditor, [contenteditable="true"], script, style';
+  const IGNORAR = DADOS + ', textarea';
   const CHAVE = 'vlado-idioma';
   const fonte = window.VLADO_I18N_EN || {textos: {}, padroes: []};
   const textos = fonte.textos || {};
@@ -30,7 +32,14 @@
     for (const [nome, valor] of Object.entries(vars || {})) texto = texto.split(`{${nome}}`).join(String(valor));
     return texto;
   }
-  const ignorado = el => !el || (el.closest && el.closest(IGNORAR));
+  // Chrome placed inside data (a citation inside an answer) opts back in with translate="yes".
+  function ignorado(el, seletor = IGNORAR) {
+    if (!el || !el.closest) return true;
+    const dado = el.closest(seletor);
+    if (!dado) return false;
+    const ilha = el.closest('[translate="yes"]');
+    return !(ilha && ilha !== dado && dado.contains(ilha));
+  }
   function texto(no) {
     if (ignorado(no.parentElement)) return;
     const registro = nos.get(no);
@@ -46,7 +55,7 @@
     }
   }
   function atributo(el, nome) {
-    if (!el.hasAttribute(nome) || ignorado(el)) return;
+    if (!el.hasAttribute(nome) || ignorado(el, DADOS)) return;
     const mapa = atributos.get(el) || {}, registro = mapa[nome], atual = el.getAttribute(nome);
     if (lingua === 'en') {
       const orig = registro && atual === registro.en ? registro.orig : atual;

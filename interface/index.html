@@ -145,7 +145,7 @@
     <section id="area-cadastro" aria-labelledby="cadastro-titulo" hidden>
     <div class="workflow" aria-label="Fluxo de entrada"><span class="current">1 · Cadastrar e conferir</span><span>2 · Perguntar à IA</span><span>3 · Conferir a resposta e as fontes</span></div>
     <div class="panel">
-      <p class="eyebrow">ETAPA 1 · ANTES DA PERGUNTA</p><h2 id="cadastro-titulo">Cadastrar documentos</h2>
+      <h2 id="cadastro-titulo">Cadastrar documentos</h2>
       <div id="pdf-ambiente-aviso" class="notice" role="status" hidden></div>
       <div id="pdf-ambiente-tecnico"></div>
       <form id="cadastro">
@@ -185,7 +185,7 @@
         <ul id="acesso-lista" class="small"></ul>
       </div>
       <div class="panel">
-        <div class="section-heading"><div><p class="eyebrow">SEU ESPAÇO DE TRABALHO</p><h2 id="gerenciar-titulo">Apurações e conversas</h2></div><button id="gerenciar-atualizar" type="button" class="secondary">Atualizar lista</button></div>
+        <div class="section-heading"><h2 id="gerenciar-titulo">Apurações e conversas</h2><button id="gerenciar-atualizar" type="button" class="secondary">Atualizar lista</button></div>
         <p class="small">Exclua o que saiu da sua mesa. Os itens vão para a lixeira e podem ser restaurados; os arquivos continuam preservados no projeto.</p>
         <label>Escolha uma apuração<select id="gerenciar-caso"><option value="">Selecione uma apuração</option></select></label>
         <div id="gerenciar-selecao" hidden>
@@ -206,7 +206,7 @@
       <form method="dialog"><p class="eyebrow">MOVER PARA A LIXEIRA</p><h2 id="excluir-titulo"></h2><p id="excluir-descricao"></p><p class="small">Você poderá restaurar em Apurações e lixeira. Documentos e registros serão preservados.</p><div class="actions"><button value="cancelar" class="secondary" autofocus>Cancelar</button><button value="excluir" class="danger">Mover para a lixeira</button></div></form>
     </dialog>
     <section id="selecao-acervo" class="panel scope-panel" aria-label="Selecionar acervo">
-      <div class="section-heading"><div><p class="eyebrow">DOCUMENTOS DESTA ANÁLISE</p><h2 id="contexto-pauta">Selecione uma apuração</h2></div><button type="button" id="atualizar" class="secondary">Atualizar lista</button></div>
+      <div class="section-heading"><div><h2 id="contexto-pauta">Selecione uma apuração</h2></div><button type="button" id="atualizar" class="secondary">Atualizar lista</button></div>
       <details id="acervo-escolha" open><summary>Escolher análise e conjunto de documentos</summary>
       <div class="selectors">
         <label>Apuração (caso)<select id="caso"><option value="">Selecione um caso</option></select></label>
@@ -320,7 +320,7 @@
       <section id="continuidade-previa" hidden><h3>Documentos que entrarão na próxima rodada</h3><div id="continuidade-documentos"></div><button id="continuidade-usar" type="button">Usar esta versão na próxima pergunta</button></section>
     </dialog>
     <dialog id="revisao-dialogo" class="human-review-dialog" aria-labelledby="revisao-titulo">
-      <div class="section-heading"><div><p class="eyebrow">CONFERÊNCIA HUMANA</p><h2 id="revisao-titulo">Conferir achado</h2></div><button id="revisao-fechar" type="button" class="secondary">Fechar</button></div>
+      <div class="section-heading"><h2 id="revisao-titulo">Conferir achado</h2><button id="revisao-fechar" type="button" class="secondary">Fechar</button></div>
       <p id="revisao-afirmacao" class="review-claim"></p>
       <div class="human-review-workspace"><section aria-labelledby="revisao-fontes-titulo"><h3 id="revisao-fontes-titulo">Trechos citados</h3><div id="revisao-fontes"></div></section>
       <form id="revisao-form"><h3>Sua avaliação</h3><p class="small">Confira as fontes e escolha o estado. A marcação e a observação serão registradas separadamente do texto original da IA.</p><label>Estado da conferência<select id="revisao-estado" aria-describedby="revisao-significado revisao-guarda"><option value="pendente">Pendente</option><option value="conferida_no_original">Conferida no original</option><option value="precisa_de_ajuste">Precisa de ajuste</option><option value="sem_suporte_suficiente">Sem suporte suficiente</option></select></label><p id="revisao-guarda" class="small" hidden></p><p id="revisao-significado" class="small"></p><label>Observação (opcional)<textarea id="revisao-observacao" rows="4" maxlength="500" placeholder="Ex.: valor correto, mas refere-se ao total do contrato."></textarea></label><p class="small" id="revisao-caracteres">0 de 500 caracteres</p><p id="revisao-erro" role="alert" hidden></p><button id="revisao-salvar">Salvar marcação</button><p id="revisao-situacao" role="status" aria-live="polite"></p><div id="revisao-historico"></div></form></div>

@@ -601,7 +601,15 @@ function pretty(value) {
   return ({declaracao_documental:'declaração documental',alegacao_atribuida:'alegação atribuída',
     inferencia:'inferência',pendencia:'pendência',nao_revisado:'não revisado',nao_sustentado:'não sustentado',
     ilegivel:'ilegível',nao_realizada:'não realizada',contradicao:'contradição',substituido:'substituído',
-    confirmacao:'confirmação',correcao:'correção'})[value] || value.replaceAll('_', ' ');
+    incluido:'incluído',confirmacao:'confirmação',correcao:'correção'})[value] || value.replaceAll('_', ' ');
+}
+// "Label: value · data": the label and the value are interface words; record text keeps its language.
+function labelled(label, value, data, className = 'small') {
+  const line = element('p', undefined, className);
+  line.append(element('span', label), ' ');
+  if (value) line.append(element('span', value));
+  if (data) { const text = element('span', value ? ` · ${data}` : data); text.setAttribute('translate', 'no'); line.append(text); }
+  return line;
 }
 function clearFindingDetails() {
   briefingSequence++; citationSequence++;
@@ -771,8 +779,9 @@ function renderEvidence(item, link, scope, version) {
     trecho:window.trechoSelecionadoCaderno(quote,ev.trecho)}));
   actions.append(original,view,copy,notebook);
   if(ev.trecho)actions.append(window.botaoAdicionarApuracao({...scope,tipo:'ia',achado_id:item.id,achado_versao:item.versao,evidencia_id:ev.id},quote,ev.trecho));
-  block.append(element('h4', Leitura.fonte({...ev, ...loc})), quote, actions, context, feedback,
-    element('p', `${pretty(link.papel)} · ${link.justificativa}`, 'small'));
+  const role = element('p', undefined, 'small'), reason = element('span', ` · ${link.justificativa}`);
+  reason.setAttribute('translate', 'no'); role.append(element('span', pretty(link.papel)), reason);
+  block.append(element('h4', Leitura.fonte({...ev, ...loc})), quote, actions, context, feedback, role);
   if (ev.modo === 'visual') block.append(element('p', 'Contexto textual indisponível; consulte o original.', 'small'));
   if (ev.limitacoes) block.append(element('p', `Limitações da evidência: ${ev.limitacoes}`, 'small'));
   const metadata = element('details',undefined,'evidence-details');
@@ -803,9 +812,8 @@ function renderFinding(item, scope, version, allowBriefing = true) {
   for (const h of item.historico.conferencias_humanas.filter(h => h.versao === item.versao)) {
     card.append(element('p',`Alcance do retorno humano: ${h.alcance} · Decisão: ${pretty(h.decisao)} · Retorno: ${h.retorno_literal_ou_referencia}`,'human-scope'));
   }
-  card.append(element('p', `Pergunta relacionada: ${item.subquestao}`, 'small'),
-    element('p',`Destino editorial: ${pretty(item.destino)}`,'small'),
-    element('p', `Verificação externa: ${pretty(item.verificacao_externa.estado)} · ${item.verificacao_externa.limitacao}`, 'small'));
+  card.append(labelled('Pergunta relacionada:', '', item.subquestao), labelled('Destino editorial:', pretty(item.destino)),
+    labelled('Verificação externa:', pretty(item.verificacao_externa.estado), item.verificacao_externa.limitacao));
   if (item.briefing) {
     card.append(element('p', 'Incluído no briefing.', 'small'));
     const artifact = findingResult?.artefatos.find(a => a.arquivo === item.briefing);

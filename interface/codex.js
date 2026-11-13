@@ -3,6 +3,7 @@
   let conversation = '', cursor = 0, view = 0, active = false, submitting = false;
   let inventoryVersion = 0, catalogVersion = 0, sourceMap = new Map(), messageMap = new Map();
   const sourceChats = new Map();
+  let conversationList = [];
   let currentStage = '';
   let currentGroup = null, currentRound = '', liveInventory = null, authenticated = null;
   let pendingFeedback = null;
@@ -28,10 +29,18 @@
   function destination() {
     const title = $('codex-caso').selectedOptions[0]?.textContent;
     const selected = [...$('codex-conversa').options].find(option => option.value === conversation);
-    const chat = conversation ? selected?.dataset.titulo || selected?.textContent || conversation : 'Nova conversa';
-    const message = draftContext.caso ? `Destino da pergunta: ${title || draftContext.caso} · ${chat}` : 'Escolha uma apuração para escrever a pergunta.';
-    if ($('codex-destino').textContent !== message) $('codex-destino').textContent = message;
+    const chat = conversation ? selected?.dataset.titulo || selected?.textContent || conversation : '';
+    const message = draftContext.caso ? `Destino da pergunta: ${title || draftContext.caso} · ${chat || 'Nova conversa'}` : 'Escolha uma apuração para escrever a pergunta.';
+    if ($('codex-destino').dataset.mensagem === message) return;
+    $('codex-destino').dataset.mensagem = message;
+    if (!draftContext.caso) { $('codex-destino').textContent = message; return; }
+    // Label and "New conversation" are chrome; case and conversation titles are data.
+    const data = text => { const span = element('span', text); span.setAttribute('translate', 'no'); return span; };
+    $('codex-destino').replaceChildren(element('span', 'Destino da pergunta: '), data(title || draftContext.caso),
+      element('span', ' · '), chat ? data(chat) : element('span', 'Nova conversa'));
   }
+  // Composite progress lines mix a run state with a stage; both words are translated as they are written.
+  const t = text => window.I18N ? window.I18N.t(text) : text;
   const stageLabels = {inventario:'Conferindo o acervo',plano:'Planejando',busca:'Buscando e lendo fontes',
     geracao_inicial:'Registrando a geração inicial',revisao:'Revisando o suporte',sintese:'Preparando a síntese',comparacao:'Comparando com a análise anterior'};
   const busyStates = new Set(['preparando','executando','aguardando_aprovacao','cancelando','publicando']);
@@ -108,7 +117,7 @@
   };
   function state(value) {
     active = busyStates.has(value);
-    $('codex-status').textContent = (names[value] || value) + (value === 'executando' && currentStage ? ' · ' + currentStage : '');
+    $('codex-status').textContent = value === 'executando' && currentStage ? `${t(names[value])} · ${currentStage}` : names[value] || value;
     if (value === 'concluido') {
       for (const group of new Set(groups.values())) group.updates.open = false;
       $('codex-andamento').open = false;
@@ -142,7 +151,9 @@
     destination();
     const selected = $('codex-caso').value;
     const title = selected ? $('codex-caso').selectedOptions[0]?.textContent : '';
-    $('codex-acervo-resumo').textContent = title ? `${title} · conversas e documentos` : 'Escolher apuração e conversa';
+    if (!title) { $('codex-acervo-resumo').textContent = 'Escolher apuração e conversa'; return; }
+    const name = element('span', title); name.setAttribute('translate', 'no');
+    $('codex-acervo-resumo').replaceChildren(name, element('span', ' · '), element('span', 'conversas e documentos'));
   }
   async function status() {
     try {
@@ -173,9 +184,21 @@
       controls();
     } catch (error) { if (version === catalogVersion) fail(error.message); }
   }
+  // An option holds plain text: the conversation title (data) and its state, written in the interface language.
+  function conversationOptions() {
+    const selected = $('codex-conversa').value;
+    $('codex-conversa').replaceChildren(new Option('Nova conversa', ''),
+      ...conversationList.map(c => {
+        const option = new Option(`${c.titulo} · ${t(names[c.estado] || c.estado)}`, c.id);
+        option.dataset.titulo = c.titulo;
+        return option;
+      }));
+    if (conversationList.some(c => c.id === selected)) $('codex-conversa').value = selected;
+  }
   async function conversations() {
     const caseId = $('codex-caso').value, version = ++inventoryVersion;
     if (!caseId) {
+      conversationList = [];
       $('codex-conversa').replaceChildren(new Option('Nova conversa', ''));
       $('codex-inventario').textContent = 'Escolha uma apuração para conferir seus documentos.';
       return;
@@ -184,12 +207,7 @@
       const list = await api('codex-listar', {caso:caseId});
       if (version !== inventoryVersion || caseId !== $('codex-caso').value) return;
       heading();
-      $('codex-conversa').replaceChildren(new Option('Nova conversa', ''),
-        ...list.conversas.map(c => {
-          const option = new Option(`${c.titulo} · ${names[c.estado] || c.estado}`, c.id);
-          option.dataset.titulo = c.titulo;
-          return option;
-        }));
+      conversationList = list.conversas; conversationOptions();
       if (list.conversas.some(c => c.id === conversation)) $('codex-conversa').value = conversation;
       else if (conversation && !active && !submitting) clear();
       destination();
@@ -223,7 +241,8 @@
   }
   function group(question = '') {
     const root = element('section', undefined, 'codex-round'), user = element('article', undefined, 'codex-message codex-user');
-    user.append(element('h3', 'Sua pergunta'), element('p', question, 'codex-text'));
+    const asked = element('p', question, 'codex-text'); asked.setAttribute('translate', 'no');
+    user.append(element('h3', 'Sua pergunta'), asked);
     const answers = element('div', undefined, 'codex-answers'), actions = element('div', undefined, 'actions');
     const updates = element('details', undefined, 'codex-updates'); updates.open = true;
     const progress = element('div', undefined, 'codex-updates-body');
@@ -242,7 +261,7 @@
       if (!hit || hit.rodada !== record.round) {
         record.pending.add(reference);
         const pending = element('span', 'Fonte pendente', 'codex-pendente');
-        pending.title = 'Esta referência não foi recuperada nesta rodada.';
+        pending.title = 'Esta referência não foi recuperada nesta rodada.'; pending.setAttribute('translate', 'yes');
         return pending;
       }
       // The citation opens the cited page itself; the side card stays open for context.
@@ -303,7 +322,7 @@
     const caseId=$('codex-caso').value;
     notebook.addEventListener('click',()=>window.abrirRegistroCaderno({caso:caseId,rodada:hit.rodada,
       documento_id:hit.documento_id,pagina_pdf:hit.pagina_pdf,
-      localizador:Leitura.localizador(hit),
+      localizador:Leitura.localizador(hit,'pt'),
       trecho:window.trechoSelecionadoCaderno(quote,hit.trecho)}));
     card.append(button,notebook,Leitura.tecnicos(element('pre', JSON.stringify(hit, null, 2), 'raw-briefing')));
     $('codex-fontes').append(card);
@@ -357,7 +376,7 @@
     } else if (event.tipo === 'ferramenta') {
       $('codex-atividades').append(element('li', `${data.acao}${data.etapa ? ' · ' + data.etapa : ''}${data.retornados !== null && data.retornados !== undefined ? ' · ' + data.retornados + ' trecho(s)' : ''} · ${data.arquivo}`));
     } else if (event.tipo === 'etapa') {
-      currentStage = stageLabels[data.etapa] || data.etapa;
+      currentStage = t(stageLabels[data.etapa] || data.etapa);
       $('codex-atividades').append(element('li', `${data.numero}/${data.total} · ${currentStage}${data.tentativa > 1 ? ' · nova tentativa automática' : ''}`));
     } else if (event.tipo === 'publicacao') {
       $('codex-atividades').append(element('li', `Achados publicados e verificados: ${data.caso} / ${data.rodada} · ${data.achados} achado(s). Conferência humana não realizada.`));
@@ -524,5 +543,14 @@
     if ([...drafts.values()].some(text => text.trim())) { event.preventDefault(); event.returnValue = ''; }
   });
   window.addEventListener('codex-abrir', async () => { await catalogs(); await status(); });
+  // Locator words follow the interface language; rebuild source titles and citations on a switch.
+  window.addEventListener('vlado-idioma', () => {
+    for (const [reference, hit] of sourceMap) {
+      const summary = document.getElementById('fonte-' + reference)?.querySelector('summary');
+      if (summary) summary.textContent = Leitura.fonte(hit);
+    }
+    for (const record of messageMap.values()) messageText(record);
+    conversationOptions();
+  });
   controls();
 })();

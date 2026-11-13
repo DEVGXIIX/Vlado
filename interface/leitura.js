@@ -19,24 +19,32 @@ window.Leitura = (() => {
     return title || 'Documento';
   }
   const quantidade = (n, singular, plural = singular + 's') => `${n} ${n === 1 ? singular : plural}`;
-  function localizador(hit) {
+  // Locator words follow the interface language; the values come from the record unchanged.
+  const PALAVRAS = {
+    pt: {pagina: 'p.', linhas: 'linhas', linha: 'linha', ausente: 'localizador não informado',
+      planilha: 'planilha', aba: 'aba', tabela: 'tabela', celula: 'célula', intervalo: 'intervalo', regiao: 'região', secao: 'seção'},
+    en: {pagina: 'page', linhas: 'lines', linha: 'line', ausente: 'locator not given',
+      planilha: 'sheet', aba: 'tab', tabela: 'table', celula: 'cell', intervalo: 'range', regiao: 'region', secao: 'section'},
+  };
+  function localizador(hit, lingua = window.I18N?.idioma?.() || 'pt') {
+    const words = PALAVRAS[lingua] || PALAVRAS.pt;
     const text = value => typeof value === 'string' ? value.trim() : typeof value === 'number' && Number.isFinite(value) ? String(value) : '';
     const loc = hit.localizador && typeof hit.localizador === 'object' ? hit.localizador : {};
     const page = text(hit.pagina_pdf) || text(loc.pagina_pdf);
-    if (page) return `página ${page}`;
+    if (page) return `${words.pagina} ${page}`;
     const first = text(hit.linha_inicio) || text(loc.linha_inicio), last = text(hit.linha_fim) || text(loc.linha_fim);
-    if (first) return last && last !== first ? `linhas ${first}–${last}` : `linha ${first}`;
+    if (first) return last && last !== first ? `${words.linhas} ${first}–${last}` : `${words.linha} ${first}`;
     const description = text(hit.localizador) || text(loc.descricao) || text(hit.descricao);
     if (description) return description;
     const parts = [];
-    for (const [key, label] of [['planilha','planilha'],['aba','aba'],['tabela','tabela'],['celula','célula'],['intervalo','intervalo'],['regiao','região'],['secao','seção']]) {
+    for (const key of ['planilha','aba','tabela','celula','intervalo','regiao','secao']) {
       const value = text(loc[key]) || text(hit[key]);
-      if (value) parts.push(`${label} ${value}`);
+      if (value) parts.push(`${words[key]} ${value}`);
     }
-    return parts.join(' · ') || 'localizador não informado';
+    return parts.join(' · ') || words.ausente;
   }
-  function fonte(hit) {
-    return `${nome(hit)} · ${localizador(hit)}`;
+  function fonte(hit, lingua) {
+    return `${nome(hit)} · ${localizador(hit, lingua)}`;
   }
   // PDF page cited by a source, when the record states one; never inferred.
   function pagina(hit) {

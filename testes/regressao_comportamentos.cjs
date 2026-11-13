@@ -164,10 +164,10 @@ test('seleção de observações permanece entre páginas e não afeta caixas ex
 test('localizadores legíveis, completos ou parciais, sem serializar objetos ou inventar posição',()=>{
   const f=fixture(),format=f.context.window.Leitura.localizador;
   for(const [value,expected] of [
-    [{pagina_pdf:3},'página 3'],[{linha_inicio:2,linha_fim:8},'linhas 2–8'],[{linha_inicio:2},'linha 2'],
+    [{pagina_pdf:3},'p. 3'],[{linha_inicio:2,linha_fim:8},'linhas 2–8'],[{linha_inicio:2},'linha 2'],
     [{localizador:'Tabela 4, rodapé'},'Tabela 4, rodapé'],
     [{localizador:{tipo:'regiao',descricao:'Canto superior direito'}},'Canto superior direito'],
-    [{localizador:{pagina_pdf:6}},'página 6'],[{localizador:{linha_inicio:4,linha_fim:4}},'linha 4'],
+    [{localizador:{pagina_pdf:6}},'p. 6'],[{localizador:{linha_inicio:4,linha_fim:4}},'linha 4'],
     [{localizador:{aba:'Despesas',celula:'B12'}},'aba Despesas · célula B12'],
     [{localizador:{tabela:2,regiao:'rodapé'}},'tabela 2 · região rodapé'],
     [{descricao:'Anexo IV'},'Anexo IV'],[{localizador:{tipo:'regiao'}},'localizador não informado'],
