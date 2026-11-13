@@ -524,25 +524,26 @@ function resetFindings() {
   $('achados-versoes-resumo').textContent = 'Análise e versão dos resultados';
   $('achados-status').textContent = 'Selecione caso e rodada; depois abra Achados da IA.';
 }
+// Each view opens with its area name as the only h1 and the investigation as context.
+const areaNames = {inicio:'Visão geral',cadastro:'Cadastrar arquivos',documentos:'Documentos',codex:'Perguntar à IA',
+  achados:'Conferir achados',apuracao:'Caderno',caderno:'Caderno',diligencias:'Diligências',gerenciar:'Apurações e lixeira'};
+let currentArea = 'inicio';
+function areaHeading() {
+  $('area-titulo').textContent = areaNames[currentArea];
+  const title = cases.find(c => c.id === window.contextoCaso?.())?.titulo, context = $('area-descricao');
+  // A case title is data: it keeps its own language.
+  if (title) { context.setAttribute('translate', 'no'); context.textContent = title; }
+  else { context.removeAttribute('translate'); context.textContent = 'Nenhuma apuração selecionada'; }
+}
+window.addEventListener('mesa-contexto-alterado', areaHeading);
+window.addEventListener('catalogo-carregado', areaHeading);
 function showArea(area) {
-  const descriptions = {
-    inicio:['SUA MESA DE TRABALHO','Comece uma apuração. Ou retome de onde parou.','Documentos, perguntas e fontes no mesmo contexto.'],
-    codex:['APURAR COM O ACERVO','Pergunte. Acompanhe. Confira as fontes.','Converse com os documentos desta apuração. A análise da IA acontece online.'],
-    cadastro:['PREPARAR O ACERVO','Primeiro, os documentos. Depois, a pergunta.','Cadastre cada envio, confira o recibo e abra Perguntar à IA para iniciar a conversa.'],
-    documentos:['CONSULTAR O ACERVO','Encontre a informação. Confira a fonte.','Pesquise nos documentos de uma rodada preparada.'],
-    gerenciar:['ORGANIZAR A MESA','Abra espaço para a próxima pergunta.','Gerencie apurações, conversas e rodadas. Tudo o que for excluído pode ser restaurado na lixeira.'],
-    caderno:['CONTRIBUIÇÕES HUMANAS','O que você encontrou nos documentos?','Guarde passagens, registre achados e construa cruzamentos com autoria humana identificada.'],
-    apuracao:['APURAÇÃO','Seu caderno de trabalho','Escreva notas, reúna evidências e exporte o caderno com referências.'],
-    diligencias:['ACOMPANHAR A APURAÇÃO','Cada pendência, uma ação.','Assuma diligências, registre respostas e retome as questões com suas fontes.'],
-    achados:['MESA DE APURAÇÃO','O que os documentos sustentam?','Selecione um achado para conferir a afirmação, as evidências e o que ainda falta verificar.']
-  };
-  for (const name of Object.keys(descriptions)) {
+  for (const name of Object.keys(areaNames)) {
     $('area-' + name).hidden = area !== name;
     $('ver-' + name).setAttribute('aria-pressed', String(area === name));
   }
   $('selecao-acervo').hidden = ['inicio','cadastro','codex','gerenciar','caderno','apuracao','diligencias'].includes(area);
-  const [label,title,description] = descriptions[area];
-  $('area-etiqueta').textContent = label; $('area-titulo').textContent = title; $('area-descricao').textContent = description;
+  currentArea = area; areaHeading();
   if (area === 'achados' && !findingCatalog) loadFindingsCatalog();
   if (area === 'gerenciar') window.dispatchEvent(new Event('gerenciar-abrir'));
   if (area === 'caderno') window.dispatchEvent(new Event('caderno-abrir'));

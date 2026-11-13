@@ -203,18 +203,8 @@
     gerenciar:'M3 6h7l2 3h9v11H3z',
     plus:'M12 5v14M5 12h14',menu:'M4 6h16M4 12h16M4 18h16'
   };
-  const labels={inicio:'Visão geral',cadastro:'Cadastrar arquivos',documentos:'Documentos',codex:'Perguntar à IA',achados:'Conferir achados',apuracao:'Caderno',diligencias:'Diligências',gerenciar:'Apurações e lixeira'};
-  const titles={
-    inicio:['CLAREZA PARA INVESTIGAR','Sua próxima reportagem começa aqui.','Documentos organizados, perguntas com contexto e fontes sempre à mão.'],
-    cadastro:['PRIMEIRO, AS FONTES','Reúna os documentos.','Cadastre cada envio e confira o recebimento antes de perguntar.'],
-    documentos:['SEU ACERVO','Documentos, com tudo no lugar.','Cadastre, pesquise e volte ao original sem perder o contexto.'],
-    codex:['CONVERSA COM O ACERVO','Pergunte. Explore. Volte à fonte.','Converse com os documentos desta apuração. A análise da IA acontece online.'],
-    achados:['A FONTE ANTES DA CONCLUSÃO','Confira o que os documentos sustentam.','Afirmação, evidência e limite de interpretação no mesmo lugar.'],
-    apuracao:['ONDE A HISTÓRIA TOMA FORMA','Seu caderno de apuração.','Notas, redação e trechos com fonte, no mesmo espaço.'],
-    caderno:['CONTRIBUIÇÕES HUMANAS','Suas leituras também fazem parte da história.','Guarde trechos, registre achados e construa cruzamentos com autoria humana identificada.'],
-    diligencias:['O QUE AINDA FALTA SABER','Transforme pendências em próximos passos.','Acompanhe solicitações e retome a pergunta quando houver novas fontes.'],
-    gerenciar:['CUIDE DO SEU ESPAÇO','Suas apurações, organizadas.','Retome uma pauta ou restaure um item movido para a lixeira.']
-  };
+  // Navigation labels are the area headings (app.js); the hidden notebook tab keeps its own.
+  const labels=Object.fromEntries(Object.entries(areaNames).filter(([name])=>name!=='caderno'));
   let inventory=null, loadedCase=null, sequence=0, loading=false;
   const scopePanel=$('selecao-acervo');
   const svg=name=>{const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('aria-hidden','true');s.classList.add('mesa-icon');const p=document.createElementNS(s.namespaceURI,'path');p.setAttribute('d',icons[name]||icons.documentos);s.append(p);return s;};
@@ -303,7 +293,7 @@
     finally{if(ticket===sequence){loading=false;$('mesa-atualizar-acervo').disabled=false;}}
   }
   function sync(){
-    const area=active(),copy=titles[area];if(copy){['area-etiqueta','area-titulo','area-descricao'].forEach((id,i)=>text(id,copy[i]));}
+    const area=active();
     document.body.dataset.mesaArea=area;navigation();tab();
     const stages=[['cadastro','Documentos'],['codex','Pergunta'],['achados','Conferência'],['apuracao','Caderno']],stage={cadastro:0,documentos:0,codex:1,achados:2,apuracao:3,caderno:3}[area];
     // Guests only ask questions; every other step is closed to them.

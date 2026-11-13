@@ -143,10 +143,6 @@
     const selected = $('codex-caso').value;
     const title = selected ? $('codex-caso').selectedOptions[0]?.textContent : '';
     $('codex-acervo-resumo').textContent = title ? `${title} · conversas e documentos` : 'Escolher apuração e conversa';
-    if (!$('area-codex').hidden) {
-      $('area-titulo').textContent = title || 'Pergunte aos seus documentos.';
-      $('area-descricao').textContent = title ? 'Perguntas, respostas e fontes desta apuração.' : 'Escolha uma apuração e abra uma conversa.';
-    }
   }
   async function status() {
     try {

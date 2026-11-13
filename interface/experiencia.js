@@ -27,7 +27,11 @@
     window.dispatchEvent(new CustomEvent('mesa-consulta', {detail:{area:name}}));
   };
   const defaults = Object.fromEntries(routeIds.map(id=>[id,$(id).value]));
-  const notice = message => { $('experiencia-status').textContent = message; };
+  // Visible notices explain a refusal; a case switch is only announced, since the heading shows it.
+  const notice = (message, visible = true) => {
+    $('experiencia-status').classList.toggle('sr-only', !visible);
+    $('experiencia-status').textContent = message;
+  };
   window.contextoCaso = () => current;
   function adapt(id, value) {
     const select = $(id);
@@ -55,7 +59,8 @@
     // Upload destination follows the desk; starting a new case is always explicit.
     adapt('cadastro-caso', value); toggleNewCase();
     try { localStorage.setItem('mesa-apuracao', value); } catch {}
-    notice(value ? `Apuração: ${cases.find(c => c.id === value)?.titulo || value}.` : 'Escolha uma apuração ou comece uma nova.');
+    notice(value ? `Apuração: ${cases.find(c => c.id === value)?.titulo || value}.` : 'Escolha uma apuração ou comece uma nova.', false);
+    window.dispatchEvent(new Event('mesa-contexto-alterado'));
     writeRoute(); return true;
   };
   $('contexto-caso').addEventListener('change', () => {

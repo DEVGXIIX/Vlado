@@ -221,6 +221,8 @@ window.VLADO_I18N_EN = {
     "Este formato precisa de um aplicativo compatível. Baixe o original para conferir.": "This format needs a compatible app. Download the original to check it.",
     "Fechar": "Close",
     "Fechar original": "Close original",
+    "Nenhuma apuração selecionada": "No investigation selected",
+    "Cadastre os documentos da pauta, pergunte à IA e confira cada achado na página do original.": "Register the story's documents, ask the AI and check each finding on its page in the original.",
     "Abrir original": "Open original",
     "Localização no original": "Location in the original",
     "Página do PDF": "PDF page",
