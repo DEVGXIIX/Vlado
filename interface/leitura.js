@@ -91,6 +91,7 @@ window.Leitura = (() => {
     flush();
   }
   function markdown(target, text, citation) {
+    target.setAttribute('translate', 'no');  // model/human text keeps its own language
     const fragment = document.createDocumentFragment(), lines = String(text).replace(/\r\n?/g, '\n').split('\n');
     const appendInline = (tag, value, parent = fragment) => {
       const item = node(tag); inline(item, value, citation); parent.append(item); return item;

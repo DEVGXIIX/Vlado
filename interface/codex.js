@@ -403,7 +403,7 @@
   $('codex-reconectar').addEventListener('click', () => { if (trackingFailed) watch(); });
   $('codex-conectar').addEventListener('click', status);
   $('codex-desligar').addEventListener('click', async () => {
-    if (!window.confirm('Encerrar o serviço local? As execuções ativas serão interrompidas. As saídas já salvas serão preservadas; será necessário abrir a Mesa novamente para continuar.')) return;
+    if (!window.confirm(window.I18N.t('Encerrar o serviço local? As execuções ativas serão interrompidas. As saídas já salvas serão preservadas; será necessário abrir a Mesa novamente para continuar.'))) return;
     try {
       await api('codex-desligar', {});
       ++view; active = false;

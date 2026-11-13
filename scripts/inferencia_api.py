@@ -19,6 +19,7 @@ import uuid
 
 from comum import ler_json
 from cadastrar_documentos import _atomico
+import segredos
 
 MODELOS_PADRAO = {'anthropic': 'claude-sonnet-5-5', 'openai': 'gpt-6.1-sol'}
 CHAVES = {'anthropic': 'ANTHROPIC_API_KEY', 'openai': 'OPENAI_API_KEY'}
@@ -34,8 +35,8 @@ def seguro(value) -> str:
     """Remove credentials from any text that may reach events, logs or the browser."""
     text = str(value)
     # Exact configured values first, whatever their format (gateways, future key shapes).
-    for nome in CHAVES.values():
-        segredo = os.environ.get(nome, '').strip()
+    valores = {os.environ.get(nome, '').strip() for nome in CHAVES.values()} | segredos.conhecidas()
+    for segredo in sorted(valores, key=len, reverse=True):
         if len(segredo) >= 8:
             text = text.replace(segredo, '[credencial omitida]')
     text = re.sub(r'(?i)((?:bearer|basic)\s+)[\w.\-+/=]+', r'\1[credencial omitida]', text)
@@ -97,6 +98,11 @@ class Resposta:
     opaco: tuple = ()
 
 
+def _ajustes(root: Path) -> Path:
+    """Choices made in the Mesa override configuracao.json without touching the versioned file."""
+    return Path(root) / 'ajustes' / 'inferencia.json'
+
+
 def ler_inferencia(root: Path) -> Inferencia:
     try:
         config = ler_json(Path(root) / 'configuracao.json')
@@ -104,6 +110,14 @@ def ler_inferencia(root: Path) -> Inferencia:
         raise ErroIA('configuracao.json ilegível; não foi possível ler a inferência.') from exc
     if not isinstance(config, dict):
         raise ErroIA('configuracao.json deve conter um objeto JSON.')
+    if _ajustes(root).is_file():
+        try:
+            ajustes = ler_json(_ajustes(root))
+        except (OSError, ValueError) as exc:
+            raise ErroIA('ajustes/inferencia.json ilegível; salve o provedor novamente na Mesa.') from exc
+        if not isinstance(ajustes, dict):
+            raise ErroIA('ajustes/inferencia.json deve conter um objeto JSON; salve o provedor novamente na Mesa.')
+        config = {**config, **{k: v for k, v in ajustes.items() if k in ('provedor', 'modelo_preferido')}}
     provedor = config.get('provedor')
     if provedor not in MODELOS_PADRAO:
         raise ErroIA('provedor em configuracao.json deve ser "anthropic" ou "openai".')
@@ -116,6 +130,42 @@ def ler_inferencia(root: Path) -> Inferencia:
     if type(limite) is not int or limite < 1:
         raise ErroIA('max_tokens_saida em configuracao.json deve ser um inteiro positivo.')
     return Inferencia(provedor, modelo.strip(), limite)
+
+
+def resumo_inferencia(root: Path) -> dict:
+    """What the settings panel may show: never a key, only presence and its last four characters."""
+    inferencia = ler_inferencia(root)
+    ajustes = ler_json(_ajustes(root)) if _ajustes(root).is_file() else {}
+    return {'provedor': inferencia.provedor, 'modelo': inferencia.modelo,
+            'modelo_preferido': ajustes.get('modelo_preferido') if 'modelo_preferido' in ajustes else None,
+            'max_tokens_saida': inferencia.max_tokens, 'modelos_padrao': dict(MODELOS_PADRAO),
+            'chaves': segredos.resumo(root)}
+
+
+def salvar_inferencia(root: Path, dados: dict) -> dict:
+    """Validate everything first, then save the key (if any) and the provider/model choice."""
+    if not isinstance(dados, dict) or set(dados) - {'provedor', 'modelo_preferido', 'chave', 'remover_chave'}:
+        raise ValueError('Campos de configuração inválidos.')
+    provedor = dados.get('provedor')
+    if provedor not in MODELOS_PADRAO:
+        raise ValueError('Escolha o provedor: Anthropic ou OpenAI.')
+    modelo = dados.get('modelo_preferido')
+    if modelo is not None and (not isinstance(modelo, str) or not modelo.strip() or len(modelo) > 100):
+        raise ValueError('Modelo inválido: informe o nome do modelo ou deixe em branco para o padrão.')
+    chave = dados.get('chave')
+    if chave not in (None, '') and (not isinstance(chave, str) or not segredos.FORMATO.fullmatch(chave.strip())):
+        raise ValueError('Chave de API em formato inválido: cole somente a chave, sem espaços (20 a 300 caracteres).')
+    if type(dados.get('remover_chave', False)) is not bool:
+        raise ValueError('Indicação de remoção da chave inválida.')
+    if chave:
+        segredos.salvar_chave(root, provedor, chave)
+    elif dados.get('remover_chave'):
+        segredos.remover_chave(root, provedor)
+    destino = _ajustes(root)
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    conteudo = {'provedor': provedor, 'modelo_preferido': modelo.strip() if modelo else None}
+    _atomico(destino, (json.dumps(conteudo, ensure_ascii=False, indent=2) + '\n').encode('utf-8'))
+    return resumo_inferencia(root)
 
 
 def criar_provedor_padrao(inferencia: Inferencia, chave: str):
@@ -203,7 +253,8 @@ class ServidorAPI:
 
     # -- account and catalog ------------------------------------------------
     def _chave(self, provedor):
-        return os.environ.get(CHAVES[provedor], '').strip()
+        """Environment variable first, then the key saved from the Mesa."""
+        return segredos.ler_chave(self.root, provedor) or ''
 
     def _conta(self, params):
         inferencia = ler_inferencia(self.root)
@@ -351,7 +402,8 @@ class ServidorAPI:
         inferencia = ler_inferencia(self.root)
         chave = self._chave(inferencia.provedor)
         if not chave:
-            raise ErroIA(f'Chave de API ausente: defina {CHAVES[inferencia.provedor]} no ambiente do servidor.',
+            raise ErroIA(f'Chave de API ausente para {inferencia.provedor}: cole a chave em Perguntar à IA › '
+                         f'Conexão e opções, ou defina {CHAVES[inferencia.provedor]} no ambiente do servidor.',
                          codigo='autenticacao')
         provedor = self.criar_provedor(inferencia, chave)
         for passo in range(MAX_PASSOS):

@@ -198,7 +198,7 @@ body>svg:has(>defs>symbol[id^="vditor-icon-"]){position:absolute;width:0;height:
  --theme-shadow:#00000066;--theme-shadow-soft:#00000033;--theme-backdrop:#080d0bd9;
  color-scheme:dark;
 }
-#mesa-tema{flex-shrink:0;min-height:36px;padding:7px 11px;font-size:12px;font-weight:500}
+#mesa-tema,#mesa-idioma{flex-shrink:0;min-height:36px;padding:7px 11px;font-size:12px;font-weight:500}
 .app-header .header-note{margin-left:auto}
 :root[data-theme=dark] .sidebar{background:var(--theme-sidebar)}
 :root[data-theme=dark] .app-header{background:var(--theme-background)}
@@ -230,6 +230,11 @@ body>svg:has(>defs>symbol[id^="vditor-icon-"]){position:absolute;width:0;height:
 :root[data-theme=dark] #apuracao-vditor .vditor-reset hr{background:var(--line)}
 :root[data-theme=dark] #apuracao-vditor .vditor-reset :is(h1,h2,table tr,table th,table td){border-color:var(--line)}
 :root[data-theme=dark] #apuracao-vditor :is(.vditor-tip__content a,.vditor-toc,.vditor-wysiwyg span[data-type=link-ref],.vditor-wysiwyg sup[data-type=footnotes-ref],.vditor-wysiwyg span[data-type=toc-h],.vditor-ir__node[data-type=link-ref],.vditor-ir__node[data-type=footnotes-ref]){color:var(--green)}
-@media(max-width:720px){#mesa-tema{min-width:88px;padding-inline:8px}.app-header .persistent-context{max-width:none}.app-header .mobile-brand{display:none}}
-@media(pointer:coarse){#mesa-tema{min-height:44px}}
-@media print{#mesa-tema{display:none}}
+@media(max-width:720px){#mesa-tema,#mesa-idioma{min-width:88px;padding-inline:8px}.app-header .persistent-context{max-width:none}.app-header .mobile-brand{display:none}}
+@media(pointer:coarse){#mesa-tema,#mesa-idioma{min-height:44px}}
+@media print{#mesa-tema,#mesa-idioma{display:none}}
+.ia-config{display:grid;gap:8px;margin:14px 0;padding-top:12px;border-top:1px solid var(--line,rgba(127,127,127,.25))}
+.ia-config h3{margin:0;font-size:15px}
+.ia-config label{display:grid;gap:4px;font-size:13px}
+.ia-config input,.ia-config select{width:100%;max-width:420px}
+body[data-papel="convidado"] [data-somente-admin]{display:none}

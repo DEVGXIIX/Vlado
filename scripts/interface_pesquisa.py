@@ -30,6 +30,7 @@ import apuracao
 import exportar_apuracao
 import diligencias
 from codex_apuracao import Conversas
+from inferencia_api import resumo_inferencia, salvar_inferencia
 import lixeira
 from indice_sqlite import (ID_CASO, ID_RODADA, ID_GERACAO, caminho_rodada,
                            cobertura, ler_passagem, pesquisar)
@@ -40,6 +41,8 @@ CADERNO_OPERACOES = ('caderno-documentos', 'caderno-listar', 'caderno-detalhe', 
                      'caderno-cruzar', 'caderno-exportar', 'caderno-original')
 DILIGENCIAS_OPERACOES = ('diligencias-listar', 'diligencias-criar', 'diligencias-atualizar',
                         'diligencias-responder', 'diligencias-original')
+# Provider choice and API key; the key is write-only from the browser's point of view.
+IA_OPERACOES = ('ia-config', 'ia-config-salvar')
 
 
 def receber_documentos(root, data):
@@ -310,6 +313,9 @@ class Handler(BaseHTTPRequestHandler):
         assets = {'/': ('index.html', 'text/html; charset=utf-8'),
                   '/app.js': ('app.js', 'text/javascript; charset=utf-8'),
                   '/codex.js': ('codex.js', 'text/javascript; charset=utf-8'),
+                  '/i18n.js': ('i18n.js', 'text/javascript; charset=utf-8'),
+                  '/i18n_en.js': ('i18n_en.js', 'text/javascript; charset=utf-8'),
+                  '/configuracao_ia.js': ('configuracao_ia.js', 'text/javascript; charset=utf-8'),
                   '/gerenciar.js': ('gerenciar.js', 'text/javascript; charset=utf-8'),
                   '/leitura.js': ('leitura.js', 'text/javascript; charset=utf-8'),
                   '/experiencia.js': ('experiencia.js', 'text/javascript; charset=utf-8'),
@@ -336,7 +342,8 @@ class Handler(BaseHTTPRequestHandler):
         name, content_type = assets[path]
         content = (ASSETS / name).read_bytes()
         if name == 'index.html':
-            content = content.replace(b'__SESSION_TOKEN__', self.server.token.encode('ascii'))
+            content = (content.replace(b'__SESSION_TOKEN__', self.server.token.encode('ascii'))
+                       .replace(b'__IDIOMA_PADRAO__', b'pt').replace(b'__PAPEL__', b'admin'))
             self._send(200, content, content_type, {'Set-Cookie': f'apuracao_session={self.server.token}; HttpOnly; SameSite=Strict; Path=/'})
         else:
             self._send(200, content, content_type)
@@ -369,7 +376,7 @@ class Handler(BaseHTTPRequestHandler):
                             'codex-desligar', 'codex-observacoes', 'codex-corpus-previa', 'codex-documentos-cadastrar', 'codex-caderno-previa', 'codex-diligencias-previa')
         if operation not in (*codex_operations, *apuracao.OPERACOES, *CADERNO_OPERACOES, *DILIGENCIAS_OPERACOES, 'analises', 'buscar', 'ler', 'cobertura', 'original', 'cadastrar', 'inventario',
                              'ambiente', 'preparar-pdfs',
-                             'gerenciar-listar', 'excluir', 'restaurar',
+                             'gerenciar-listar', 'excluir', 'restaurar', *IA_OPERACOES,
                              'achados-revisao-salvar',
                              'achados-catalogo', 'achados-buscar', 'achados-detalhe',
                              'achados-evidencia', 'achados-original', 'achados-exportar', 'achados-briefing'):
@@ -381,6 +388,10 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError('Requisição deve ser um objeto JSON.')
             if operation == 'ambiente':
                 result = self.server.ambiente
+            elif operation == 'ia-config':
+                result = resumo_inferencia(self.server.root)
+            elif operation == 'ia-config-salvar':
+                result = salvar_inferencia(self.server.root, data)
             elif operation == 'apuracao-exportar':
                 with self.server.cadastro_lock:
                     state = apuracao.listar(self.server.root, data.get('caso'))

@@ -6,7 +6,7 @@
   const uid=()=>crypto.randomUUID().replaceAll('-','');
   function error(message=''){$('apuracao-erro').textContent=message;$('apuracao-erro').hidden=!message;}
   function dialogError(message=''){$('apuracao-adicionar-erro').textContent=message;$('apuracao-adicionar-erro').hidden=!message;}
-  function discard(){return !dirty||window.confirm('Há alterações não salvas. Descartar essas alterações?');}
+  function discard(){return !dirty||window.confirm(window.I18N.t('Há alterações não salvas. Descartar essas alterações?'));}
   function controls(){
     const ready=!!state&&!busy;
     $('apuracao-caso').disabled=busy;
@@ -82,7 +82,7 @@
     catch(failure){error(failure.message);}finally{busy=false;controls();}
   });
   $('apuracao-excluir').addEventListener('click',async()=>{
-    if(busy||!noteId||!window.confirm('Excluir esta nota do caderno? As fontes serão preservadas.'))return;
+    if(busy||!noteId||!window.confirm(window.I18N.t('Excluir esta nota do caderno? As fontes serão preservadas.')))return;
     busy=true;controls();error();try{apply(await api('apuracao-excluir',{caso:state.caso,revisao:state.revisao,nota_id:noteId,requisicao_id:uid()}),null);}catch(failure){error(failure.message);}finally{busy=false;controls();}
   });
   $('apuracao-exportar').addEventListener('click',async()=>{

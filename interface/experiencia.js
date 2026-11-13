@@ -202,7 +202,7 @@
       $(formId).addEventListener('input',()=>{dirty=true;}); $(formId).addEventListener('change',()=>{dirty=true;});
     }
     const close=dialog.querySelector('.section-heading button');
-    const check=()=>!dirty || window.confirm('Há texto ou alterações não salvas. Descartar e fechar?');
+    const check=()=>!dirty || window.confirm(window.I18N.t('Há texto ou alterações não salvas. Descartar e fechar?'));
     close.addEventListener('click',event=>{if(!check()){event.preventDefault();event.stopImmediatePropagation();}},true);
     dialog.addEventListener('cancel',event=>{if(!check())event.preventDefault();},true);
     dialog.addEventListener('close',()=>{dirty=false;});

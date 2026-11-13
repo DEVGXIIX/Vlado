@@ -120,6 +120,7 @@ class CodexIntegrationTest(unittest.TestCase):
         self.assertEqual(thread_params['model'], 'modelo-informado-fixture')
         self.assertEqual([t['name'] for t in thread_params['dynamicTools']], ['consultar_acervo'])
         self.assertFalse({'permissions', 'config', 'approvalPolicy'} & set(thread_params))
+        self.assertIn('idioma da pergunta', thread_params['developerInstructions'])
         self.assertTrue(thread_params['cwd'].endswith('workspace'))
         rpc.emit('item/tool/call', {'tool': 'consultar_acervo', 'arguments': {'acao': 'buscar', 'consulta': 'Alfabeto'},
                                   'callId': 'c1', 'turnId': 'turn-fixture'}, request=123)
