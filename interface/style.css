@@ -242,3 +242,5 @@ body[data-papel="convidado"] [data-somente-admin]{display:none}
 body[data-papel="convidado"] .areas button:not(#ver-codex),body[data-papel="convidado"] .areas .eyebrow,body[data-papel="convidado"] #mesa-nova,body[data-papel="convidado"] .first-use,body[data-papel="convidado"] #codex-desligar,body[data-papel="convidado"] #codex-excluir,body[data-papel="convidado"] #codex-continuar-documentos,body[data-papel="convidado"] .persistent-context{display:none}
 body[data-modo="piloto"] #codex-desligar{display:none}
 #acesso-link{width:100%;font-family:monospace}
+/* While "Conexão e opções" is open, the question composer must not cover the settings form. */
+#area-codex:has(#codex-conexao[open]) #codex-form{position:static;max-height:none}
