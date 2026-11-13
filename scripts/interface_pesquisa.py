@@ -496,7 +496,7 @@ class Handler(BaseHTTPRequestHandler):
                             'codex-desligar', 'codex-observacoes', 'codex-corpus-previa', 'codex-documentos-cadastrar', 'codex-caderno-previa', 'codex-diligencias-previa')
         if operation not in (*codex_operations, *apuracao.OPERACOES, *CADERNO_OPERACOES, *DILIGENCIAS_OPERACOES, 'analises', 'buscar', 'ler', 'cobertura', 'original', 'cadastrar', 'inventario',
                              'ambiente', 'preparar-pdfs',
-                             'gerenciar-listar', 'excluir', 'restaurar', *IA_OPERACOES, *ACESSO_OPERACOES, 'sessao-sair',
+                             'gerenciar-listar', 'excluir', 'restaurar', 'lixeira-alcance', 'lixeira-apagar', *IA_OPERACOES, *ACESSO_OPERACOES, 'sessao-sair',
                              'achados-revisao-salvar',
                              'achados-catalogo', 'achados-buscar', 'achados-detalhe',
                              'achados-evidencia', 'achados-original', 'achados-exportar', 'achados-briefing'):
@@ -554,6 +554,19 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, path.read_bytes(), 'application/octet-stream',
                                {'Content-Disposition': f'attachment; filename="original{path.suffix}"'})
                 return
+            elif operation == 'lixeira-alcance':
+                result = lixeira.alcance(self.server.root, data.get('item'))
+            elif operation == 'lixeira-apagar':
+                with self.server.cadastro_lock:
+                    alcance = lixeira.alcance(self.server.root, data.get('item'))
+                    nome = data.get('nome')
+                    if (not isinstance(nome, str)
+                            or nome.strip().casefold() != str(alcance['nome_para_confirmar']).strip().casefold()):
+                        raise ValueError('Digite o nome do item exatamente como mostrado para confirmar.')
+                    result = lixeira.apagar_definitivamente(
+                        self.server.root, data.get('item'), data.get('confirmacao'),
+                        quem=principal.get('nome') or principal.get('convite') or 'operador local',
+                        gerenciador=self.server.conversas)
             elif operation in ('gerenciar-listar', 'excluir', 'restaurar'):
                 with self.server.cadastro_lock:
                     manager = self.server.conversas

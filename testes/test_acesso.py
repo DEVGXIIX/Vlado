@@ -179,7 +179,7 @@ class PilotoHttpTest(unittest.TestCase):
         status, _, body = self.request('GET', '/api/catalogo', headers={'Cookie': self.cookie})
         self.assertEqual([c['id'] for c in json.loads(body)['casos']], ['alpha'])
         for operation in ('cadastrar', 'ia-config', 'ia-config-salvar', 'gerenciar-listar', 'acesso-listar',
-                          'codex-desligar', 'buscar', 'caderno-listar'):
+                          'codex-desligar', 'buscar', 'caderno-listar', 'lixeira-alcance', 'lixeira-apagar'):
             with self.subTest(operation=operation):
                 self.assertEqual(self.post(operation, {'caso': 'alpha'})[0], 403)
         self.assertEqual(self.post('codex-listar', {'caso': 'beta'})[0], 403)
