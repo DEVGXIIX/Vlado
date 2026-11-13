@@ -1,0 +1,267 @@
+{
+  "esquema": 1,
+  "caso_id": "alpha",
+  "rodada": "R001",
+  "snapshot_sha256": "d16d6bc3e5d6854ab0707ed915e1bb7aa5314bdde5698e81ca583fdffe2110a4",
+  "revisao": "r2",
+  "anterior": {
+    "revisao": "r1",
+    "registros_sha256": "988cd66c2c5a52efd81342546767721cb1d03ada163eeea00aa4023dc856cf3b"
+  },
+  "achados": [
+    {
+      "id": "A001",
+      "subquestao": "Valores declarados?",
+      "versoes": [
+        {
+          "versao": 1,
+          "redacao": "A fonte declara valor 12. <script>window.INJETADO=1</script>",
+          "natureza": "alegacao_atribuida",
+          "limitacoes": "Redação inicial sujeita à revisão."
+        },
+        {
+          "versao": 2,
+          "redacao": "A fonte declara valor 12.",
+          "natureza": "alegacao_atribuida",
+          "limitacoes": "Declaração documental, sem verificação externa."
+        }
+      ]
+    },
+    {
+      "id": "A002",
+      "subquestao": "O valor foi pago?",
+      "versoes": [
+        {
+          "versao": 1,
+          "redacao": "Não foi estabelecido pagamento.",
+          "natureza": "pendencia",
+          "limitacoes": "Sem suporte."
+        }
+      ]
+    }
+  ],
+  "evidencias": [
+    {
+      "id": "E001",
+      "documento_id": "D001",
+      "modo": "indexada",
+      "original": "entradas/casos/alpha/cadastros/f58d24c0c0d7449fa130a99be327929c/originais/D001_texto.txt",
+      "original_sha256": "9603b236cc216910f21b120ca3a0ded51d91f21b61c96d34a640852c70560ed8",
+      "fonte_textual": "entradas/casos/alpha/cadastros/f58d24c0c0d7449fa130a99be327929c/originais/D001_texto.txt",
+      "fonte_sha256": "9603b236cc216910f21b120ca3a0ded51d91f21b61c96d34a640852c70560ed8",
+      "indice": {
+        "indice_id": "1bf6c60745f140a5a0ca2fbe8f7f80467ef564843515b6c122471d173592d849",
+        "banco_sha256": "dba53cc537c0d4260b99aa4d41bb834a8d9e0eb4cfdfb83660b1a3a90fc92fe8",
+        "geracao": "v1",
+        "referencia": "1ececdfb7964f5f05730a89fda0e719d43d8493e8a15f031fa9dab87252452b4"
+      },
+      "localizador": {
+        "tipo": "linhas",
+        "pagina_pdf": null,
+        "linha_inicio": 1,
+        "linha_fim": 1,
+        "descricao": ""
+      },
+      "trecho": "A fonte declara valor 12.",
+      "atribuicao": "Fonte sintética",
+      "contexto": "Declaração em teste.",
+      "limitacoes": "Não comprova pagamento."
+    },
+    {
+      "id": "E002",
+      "documento_id": "D001",
+      "modo": "indexada",
+      "original": "entradas/casos/alpha/cadastros/f58d24c0c0d7449fa130a99be327929c/originais/D001_texto.txt",
+      "original_sha256": "9603b236cc216910f21b120ca3a0ded51d91f21b61c96d34a640852c70560ed8",
+      "fonte_textual": "entradas/casos/alpha/cadastros/f58d24c0c0d7449fa130a99be327929c/originais/D001_texto.txt",
+      "fonte_sha256": "9603b236cc216910f21b120ca3a0ded51d91f21b61c96d34a640852c70560ed8",
+      "indice": {
+        "indice_id": "1bf6c60745f140a5a0ca2fbe8f7f80467ef564843515b6c122471d173592d849",
+        "banco_sha256": "dba53cc537c0d4260b99aa4d41bb834a8d9e0eb4cfdfb83660b1a3a90fc92fe8",
+        "geracao": "v1",
+        "referencia": "1ececdfb7964f5f05730a89fda0e719d43d8493e8a15f031fa9dab87252452b4"
+      },
+      "localizador": {
+        "tipo": "linhas",
+        "pagina_pdf": null,
+        "linha_inicio": 2,
+        "linha_fim": 2,
+        "descricao": ""
+      },
+      "trecho": "Outra versão declara valor 14.",
+      "atribuicao": "Fonte sintética",
+      "contexto": "Declaração em teste.",
+      "limitacoes": "Não comprova pagamento."
+    },
+    {
+      "id": "E003",
+      "documento_id": "D002",
+      "modo": "visual",
+      "original": "entradas/casos/alpha/cadastros/f58d24c0c0d7449fa130a99be327929c/originais/D002_visual.pdf",
+      "original_sha256": "59be5d5fcfff9756bb58c04ef3a981e106565d58b6c2acb2ff1aabbe37112724",
+      "fonte_textual": null,
+      "fonte_sha256": null,
+      "indice": null,
+      "localizador": {
+        "tipo": "pagina",
+        "pagina_pdf": 1,
+        "linha_inicio": null,
+        "linha_fim": null,
+        "descricao": "Página sintética vazia"
+      },
+      "trecho": "",
+      "atribuicao": "PDF sintético",
+      "contexto": "Página visual sem FTS.",
+      "limitacoes": "Página vazia."
+    }
+  ],
+  "vinculos": [
+    {
+      "achado_id": "A001",
+      "versao": 1,
+      "evidencia_id": "E001",
+      "papel": "suporte",
+      "justificativa": "Relação sintética atribuída."
+    },
+    {
+      "achado_id": "A001",
+      "versao": 1,
+      "evidencia_id": "E002",
+      "papel": "contradicao",
+      "justificativa": "Relação sintética atribuída."
+    },
+    {
+      "achado_id": "A001",
+      "versao": 1,
+      "evidencia_id": "E003",
+      "papel": "contexto",
+      "justificativa": "Relação sintética atribuída."
+    },
+    {
+      "achado_id": "A001",
+      "versao": 2,
+      "evidencia_id": "E001",
+      "papel": "suporte",
+      "justificativa": "Relação sintética atribuída."
+    },
+    {
+      "achado_id": "A001",
+      "versao": 2,
+      "evidencia_id": "E002",
+      "papel": "contradicao",
+      "justificativa": "Relação sintética atribuída."
+    },
+    {
+      "achado_id": "A001",
+      "versao": 2,
+      "evidencia_id": "E003",
+      "papel": "contexto",
+      "justificativa": "Relação sintética atribuída."
+    }
+  ],
+  "revisoes_assistidas": [
+    {
+      "achado_id": "A001",
+      "versao": 1,
+      "suporte": "parcial",
+      "motivo": "Remover código estranho da redação.",
+      "fontes_reabertas": [
+        "E001",
+        "E002",
+        "E003"
+      ],
+      "limitacoes": "Revisão pela IA.",
+      "acao": "corrigir"
+    },
+    {
+      "achado_id": "A001",
+      "versao": 2,
+      "suporte": "sustentado",
+      "motivo": "Atribuição delimitada.",
+      "fontes_reabertas": [
+        "E001",
+        "E002",
+        "E003"
+      ],
+      "limitacoes": "Revisão pela IA.",
+      "acao": "manter"
+    }
+  ],
+  "destinos": [
+    {
+      "achado_id": "A001",
+      "versao": 2,
+      "destino": "incluido",
+      "motivo": "Alegação atribuída sustentada.",
+      "briefing": "saidas/08_briefing.md",
+      "revisao_suporte": 2
+    }
+  ],
+  "conferencias_humanas": [],
+  "verificacao_externa": {
+    "estado": "nao_realizada",
+    "relato": null,
+    "limitacao": "Corpus fechado; sem verificação externa."
+  },
+  "procedencia": [
+    {
+      "etapa": "busca",
+      "artefatos": [
+        "saidas/04_evidencias_brutas.md",
+        "saidas/05_cruzamentos_brutos.md"
+      ],
+      "ferramentas": [
+        "fixture sintética"
+      ],
+      "modelo_informado_ou_observado": null
+    },
+    {
+      "etapa": "revisao",
+      "artefatos": [
+        "saidas/06_revisao_assistida.md",
+        "saidas/07_achados_revisados.md"
+      ],
+      "ferramentas": [
+        "fixture sintética"
+      ],
+      "modelo_informado_ou_observado": null
+    },
+    {
+      "etapa": "sintese",
+      "artefatos": [
+        "saidas/08_briefing.md"
+      ],
+      "ferramentas": [
+        "fixture sintética"
+      ],
+      "modelo_informado_ou_observado": null
+    }
+  ],
+  "artefatos": [
+    {
+      "arquivo": "saidas/04_evidencias_brutas.md",
+      "sha256": "111fe8a72003e0d5d2219315235a90dca7a6bb9f14c26e074503c101e2ffcb9e",
+      "tipo": "evidencias"
+    },
+    {
+      "arquivo": "saidas/05_cruzamentos_brutos.md",
+      "sha256": "d4eb6b11291c2dc9a863e50382891dc6ae3c76ec8fbc09062d5ef296a018c169",
+      "tipo": "cruzamentos"
+    },
+    {
+      "arquivo": "saidas/06_revisao_assistida.md",
+      "sha256": "9d2db424c3784ded5d87813cea567170801b77130010d936d11a0beeee32c867",
+      "tipo": "revisao"
+    },
+    {
+      "arquivo": "saidas/07_achados_revisados.md",
+      "sha256": "7761f15cbef9701667db6d13b99113f4bd0753f4260d9b5b8441b86ccb267929",
+      "tipo": "achados_revisados"
+    },
+    {
+      "arquivo": "saidas/08_briefing.md",
+      "sha256": "64c679c7ff92019732299231f4ab3b67d3ef835317f8161feb7b3039d685f040",
+      "tipo": "briefing"
+    }
+  ]
+}

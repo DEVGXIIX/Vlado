@@ -1,0 +1,17 @@
+{
+  "name": "vditor",
+  "version": "4.0.1",
+  "source": "https://github.com/Vanessa219/vditor",
+  "package": "https://registry.npmjs.org/vditor/-/vditor-4.0.1.tgz",
+  "integrity": "sha512-CyajvPNE8fjCgEAzAaSxVEEWwQMJ5FTIVkNn3k+5IRaldqGwPRr8Dx2QLALHGCby8L/AJ6pQXjXiSPUGhHGmDw==",
+  "license": "MIT",
+  "files": {
+    "dist/css/content-theme/light.css": "9848c5a4d637f1803859b18ece4aa9df17d03a706f3d6416ba729c357d4ee360",
+    "dist/index.css": "c6e693e24d3c0b472b435d48d9baff62bee62d13f5265723265256e73f310dba",
+    "dist/index.min.js": "aac93a3647a200b324dbb40734c173893205fe2ed7330336dd376582d33a04cd",
+    "dist/js/i18n/pt_BR.js": "f034cb9672c18c6ae2691a8838869490de6496e97d05bdce38284757dc053248",
+    "dist/js/icons/ant.js": "a91e14e09dcd7b99f49b7b8dcc6301fed6774d62547fcf4e971757aa3a802c33",
+    "dist/js/lute/lute.min.js": "53b61b051a3dfd9ee5a5010c873233679e139d8e62c49da08b4c2f2c195587cb",
+    "LICENSE": "c50d6e1944c4c1558ef12a5cfa4f0a4e8c927a56908c1a587c9d60400eef66fe"
+  }
+}

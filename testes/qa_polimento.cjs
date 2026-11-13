@@ -1,0 +1,98 @@
+const {chromium} = require('playwright');
+const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const [origin, output, chrome] = process.argv.slice(2);
+(async () => {
+  await fs.mkdir(output, {recursive:true});
+  const browser = await chromium.launch({headless:true, ...(chrome ? {executablePath:chrome} : {})});
+  const page = await browser.newPage({viewport:{width:1440, height:1100}, acceptDownloads:true});
+  const errors = [], external = [], checks = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('request', request => { if (!request.url().startsWith(origin)) external.push(request.url()); });
+  async function conversation() {
+    if (!await page.locator('#codex-acervo').evaluate(el => el.open)) await page.locator('#codex-acervo>summary').click();
+    await page.selectOption('#codex-caso', 'fontes');
+    await page.locator('#codex-conversa option[value="' + 'a'.repeat(32) + '"]').waitFor({state:'attached'});
+    await page.selectOption('#codex-conversa', 'a'.repeat(32));
+    await page.locator('.codex-answer').waitFor();
+    await page.locator('#codex-status').filter({hasText:'Execução concluída'}).waitFor();
+    assert.equal(await page.locator('#codex-acervo').evaluate(el => el.open), false);
+  }
+  try {
+    await page.goto(origin);
+    await page.click('#ver-cadastro');
+    assert.equal(await page.locator('#cadastro-id').count(), 0);
+    await page.fill('#cadastro-titulo-input', 'Minha apuração legível');
+    await page.setInputFiles('#cadastro-arquivos', {name:'Documento sintético.txt', mimeType:'text/plain', buffer:Buffer.from('Cadastro de interface, sem pergunta editorial.')});
+    await page.click('#enviar-documentos');
+    await page.locator('#cadastro-status').filter({hasText:'Aguardando sua pergunta'}).waitFor();
+    assert.match(await page.locator('#cadastro-caso').inputValue(), /^apuracao_[a-f0-9]{32}$/);
+    assert.equal(await page.locator('#cadastro-caso option:checked').innerText(), 'Minha apuração legível');
+    assert.doesNotMatch(await page.locator('#cadastro-recibo').innerText(), /apuracao_|SHA-256/);
+    checks.push('Cadastro apenas por nome, ID interno automático, recibo sem identificadores expostos.');
+    await page.click('#ver-codex');
+    await page.locator('#codex-conta').filter({hasText:'Conectado ao ChatGPT'}).waitFor();
+    assert.equal(await page.locator('#codex-conexao').evaluate(el => el.open), false);
+    assert.equal(await page.locator('#codex-caso option[value="fontes"]').innerText(), 'Americanas — fatos relevantes');
+    await conversation();
+    assert.equal(await page.locator('.codex-updates').evaluate(el => el.open), false);
+    assert.equal(await page.locator('#codex-andamento').evaluate(el => el.open), false);
+    assert.equal(await page.locator('.codex-answer>.technical').evaluate(el => el.open), false);
+    assert.equal(await page.locator('.codex-answer .markdown-body strong').first().innerText(), 'Valor documentado:');
+    assert.equal(await page.locator('.codex-answer table th').count(), 2);
+    assert.equal(await page.locator('.codex-answer table td').count(), 2);
+    assert.match(await page.locator('.codex-answer pre code').first().innerText(), /\*\*texto literal em código\*\*/);
+    assert.equal(await page.locator('.markdown-body script,.markdown-body img,.markdown-body a[href^="javascript:"]').count(), 0);
+    assert.equal(await page.evaluate(() => window.INJETADO_POLIMENTO), undefined);
+    checks.push('Conexão compacta; resposta destacada; atualizações e registros recolhidos; Markdown e tabelas renderizados com HTML inerte.');
+    const limitation = await page.locator('#codex-limitacoes').innerText();
+    assert.match(limitation, /páginas 2/);
+    assert.match(limitation, /1 referência/);
+    assert.doesNotMatch(limitation, /[a-f0-9]{64}/);
+    assert.equal(await page.locator('.codex-answer .codex-pendente').count(), 1);
+    const citation = page.locator('.codex-answer a.source-citation');
+    assert.equal(await citation.innerText(), 'Fato relevante de 11/01/2023 · página 1');
+    await citation.click();
+    const source = page.locator('#codex-fontes>.codex-source').first();
+    assert.equal(await source.evaluate(el => el.open), true);
+    assert.equal(await source.locator('blockquote').evaluate(el => el === document.activeElement), true);
+    assert.match(await source.locator('blockquote').innerText(), /Valor sintetico 123/);
+    assert.doesNotMatch(await source.innerText(), /[a-f0-9]{64}/);
+    await source.locator('.technical>summary').click();
+    assert.match(await source.locator('.technical').innerText(), /[a-f0-9]{64}/);
+    await source.locator('.technical>summary').click();
+    const downloaded = page.waitForEvent('download');
+    await source.getByRole('button', {name:'Baixar original preservado'}).click();
+    assert.equal((await fs.readFile(await (await downloaded).path())).subarray(0,4).toString(), '%PDF');
+    checks.push('Citação por título e página abre o trecho com foco; hashes recolhidos; original preservado e baixável.');
+    checks.push('Alertas específicos: página sem texto e fonte pendente, sem exibição de hashes.');
+    await page.evaluate(() => document.fonts.ready);
+    assert.equal(await page.evaluate(() => document.fonts.check('17px "Source Sans 3"') && document.fonts.check('26px "Source Serif 4"')), true);
+    await page.screenshot({path:path.join(output, 'resposta-desktop.png'), fullPage:true});
+    for (const width of [320,390,736,1440]) {
+      await page.setViewportSize({width, height:950});
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'overflow ' + width);
+      if (width === 390) await page.screenshot({path:path.join(output, 'resposta-mobile.png'), fullPage:true});
+    }
+    await page.reload();
+    await page.click('#ver-codex');
+    await page.locator('#codex-caso option[value="fontes"]').waitFor({state:'attached'});
+    await conversation();
+    assert.match(await page.locator('#codex-limitacoes').innerText(), /páginas 2/);
+    await page.locator('#codex-acervo>summary').click();
+    await page.selectOption('#codex-caso', 'alpha');
+    await page.locator('#codex-inventario').filter({hasText:'1 documento'}).waitFor({state:'attached'});
+    assert.equal(await page.locator('#codex-limitacoes').isVisible(), false);
+    assert.equal(await page.locator('.codex-answer').count(), 0);
+    checks.push('Recarga preserva apresentação e limitações; troca para acervo sem lacunas remove os alertas.');
+    checks.push('Fontes locais e layout sem transbordamento de 320 a 1440 px.');
+    assert.deepEqual(external, []);
+    assert.deepEqual(errors, []);
+    await fs.writeFile(path.join(output, 'resultado.json'), JSON.stringify({estado:'ok', natureza:'arquivos e eventos sintéticos; login simulado; sem inferência', checks, errors, external}, null, 2));
+    console.log('QA polimento: OK (' + checks.length + ' verificações)');
+  } catch (error) {
+    await page.screenshot({path:path.join(output, 'falha.png'), fullPage:true}).catch(() => {});
+    throw error;
+  } finally { await browser.close(); }
+})().catch(error => { console.error(error); process.exitCode = 1; });

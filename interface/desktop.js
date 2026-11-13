@@ -1,0 +1,354 @@
+'use strict';
+// Appearance belongs to this browser, independently of the selected case.
+(() => {
+  const key = 'apuracao:tema';
+  const button = document.getElementById('mesa-tema');
+  const meta = document.querySelector('meta[name="theme-color"]');
+  function apply(value) {
+    const theme = value === 'light' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = theme;
+    const label = theme === 'dark' ? 'Modo claro' : 'Modo escuro';
+    button.textContent = label;
+    button.setAttribute('aria-label', `Ativar ${label.toLowerCase()}`);
+    meta.content = theme === 'dark' ? '#171d1a' : '#f6f5f0';
+  }
+  let saved;
+  try { saved = localStorage.getItem(key); } catch (_) { /* Storage may be blocked. */ }
+  apply(saved);
+  button.addEventListener('click', () => {
+    const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    apply(theme);
+    try { localStorage.setItem(key, theme); } catch (_) { /* Switching still works. */ }
+  });
+  window.addEventListener('storage', event => {
+    if (event.key === key || event.key === null) apply(event.newValue);
+  });
+})();
+// Adaptive operational controls. The approved editorial shell follows below.
+(() => {
+  const desktop = matchMedia('(min-width: 1051px)');
+  const form = $('codex-form'), header = document.querySelector('.app-header');
+  const navigation = [...document.querySelectorAll('.areas button:not([hidden])')].map(button => ({button,id:button.id,link:null}));
+  const metadata = new Map();
+  let body = null, toolbar = null, toggle = null, caption = null, collapsed = false, hadAnswer = false;
+  let savedDetails = null;
+  let findingControls = null, findingFormNodes = null;
+  let findingSearchPosition = null;
+  let appliedDesktop = null;
+  const activeArea = () => window.enderecoAreaMesa().searchParams.get('area');
+  function navigationState() {
+    if (!desktop.matches) return;
+    const area = activeArea();
+    for (const item of navigation) {
+      if (!item.link) continue;
+      const target = item.id.replace('ver-','');
+      item.link.href = window.enderecoAreaMesa(target);
+      item.link.removeAttribute('aria-pressed');
+      if (target === area || target === 'apuracao' && area === 'caderno') item.link.setAttribute('aria-current','page');
+      else item.link.removeAttribute('aria-current');
+    }
+  }
+  function geometry() {
+    if (!desktop.matches) return;
+    document.documentElement.style.setProperty('--mesa-header-height',`${header.getBoundingClientRect().height}px`);
+    document.documentElement.style.setProperty('--mesa-composer-height',`${form.getBoundingClientRect().height}px`);
+  }
+  const resize = new ResizeObserver(geometry);
+  resize.observe(header);resize.observe(form);
+  function renderComposer() {
+    if (!body) return;
+    if (body.hidden !== collapsed) body.hidden = collapsed;
+    form.classList.toggle('desktop-composer-closed',collapsed);
+    toggle.setAttribute('aria-expanded',String(!collapsed));
+    const label = collapsed ? 'Escrever pergunta' : 'Recolher pergunta';
+    if (toggle.textContent !== label) toggle.textContent = label;
+    const text = collapsed ? ($('codex-pergunta').value.trim() ? 'Rascunho preservado' : 'Continue a conversa com os documentos') : 'Sua pergunta';
+    if (caption.textContent !== text) caption.textContent = text;
+  }
+  window.abrirComposicaoMesa = () => {
+    if (!desktop.matches || !body) return;
+    collapsed = false;renderComposer();
+  };
+  function composerState() {
+    if (!body || !desktop.matches) return;
+    const hasAnswer = !!$('codex-mensagens').querySelector('.codex-answer');
+    const hasPending = [...body.querySelectorAll('.feedback-preview')].some(panel => !panel.hidden);
+    if (hasPending) collapsed = false;
+    else if (hasAnswer && !hadAnswer && !$('codex-pergunta').value.trim() && !form.contains(document.activeElement)) collapsed = true;
+    else if (!hasAnswer && hadAnswer) collapsed = false;
+    hadAnswer = hasAnswer;
+    renderComposer();
+  }
+  function compactFindings() {
+    if (!desktop.matches || activeArea() !== 'achados' || !findingResult) return;
+    const analysis = $('rodada').selectedOptions[0]?.textContent || $('rodada').value;
+    const review = $('achados-revisao').selectedOptions[0]?.textContent || '';
+    const generation = $('achados-geracao').selectedOptions[0]?.textContent || '';
+    $('acervo-escolha').open = false;
+    $('acervo-escolha').querySelector('summary').textContent = `${analysis} · trocar análise`;
+    $('achados-versoes').open = false;
+    $('achados-versoes-resumo').textContent = `${review} · ${generation} · trocar versão`;
+    if (findingControls) findingControls.open = false;
+    $('selecao-acervo').classList.add('desktop-scope-ready');
+  }
+  function feedbackState() {
+    if (!desktop.matches) return;
+    document.querySelector('.feedback-selection').classList.toggle('desktop-no-selection',$('observacoes-limpar').disabled && $('observacoes-continuar').disabled);
+  }
+  function activate() {
+    // Media-query notifications may be queued for an already applied layout.
+    if (appliedDesktop === desktop.matches) return;
+    appliedDesktop = desktop.matches;
+    if (desktop.matches) {
+      savedDetails = [$('acervo-escolha'),$('achados-versoes')].map(node => ({node,open:node.open,summary:node.querySelector('summary').textContent}));
+      for (const item of navigation) {
+        const link = element('a',item.button.textContent);
+        link.id = item.id;link.className = item.button.className;
+        link.setAttribute('aria-controls',item.button.getAttribute('aria-controls'));
+        link.addEventListener('click',event => {
+          if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) return;
+          event.preventDefault();item.button.click();
+        });
+        // Keep the original node and all its action listeners for mobile and resize.
+        item.button.removeAttribute('id');item.button.replaceWith(link);item.link = link;
+      }
+      body = element('div');body.id = 'desktop-composicao';
+      body.append(...form.childNodes);
+      toolbar = element('div',undefined,'desktop-composer-toolbar');
+      caption = element('span','Sua pergunta','small');
+      toggle = element('button','Recolher pergunta','secondary');toggle.type = 'button';
+      toggle.id = 'desktop-composicao-alternar';toggle.setAttribute('aria-controls',body.id);
+      toggle.addEventListener('click',() => {
+        collapsed = !collapsed;renderComposer();
+        if (!collapsed) $('codex-pergunta').focus();
+        else toggle.focus();
+      });
+      toolbar.append(caption,toggle);form.append(toolbar,body);
+      collapsed = false;hadAnswer = false;composerState();
+      const findingsForm = $('achados-form');
+      findingFormNodes = [...findingsForm.childNodes];
+      findingControls = element('details',undefined,'desktop-finding-filters');
+      findingControls.append(element('summary','Pesquisar e filtrar achados'));
+      const fields = element('div',undefined,'desktop-finding-fields');
+      for (const child of [...findingsForm.children]) {
+        if (child.classList.contains('human-review-toolbar') || child.classList.contains('actions') || child.id === 'achados-filtros-ativos') continue;
+        fields.append(child);
+      }
+      const search=$('achados-buscar');
+      findingSearchPosition={button:search,parent:search.parentNode,next:search.nextSibling};
+      fields.append(search);findingControls.append(fields);
+      findingsForm.querySelector('.human-review-toolbar').after(findingControls);
+      for (const field of document.querySelectorAll('input[id],textarea[id],select[id]')) {
+        metadata.set(field,{name:field.getAttribute('name'),autocomplete:field.getAttribute('autocomplete')});
+        if (!field.hasAttribute('name')) field.name = field.id;
+        if (!field.hasAttribute('autocomplete') && !['file','checkbox'].includes(field.type) && field.tagName !== 'SELECT') field.autocomplete = 'off';
+      }
+      compactFindings();feedbackState();navigationState();geometry();
+    } else {
+      for (const item of navigation) {
+        if (!item.link) continue;
+        item.button.id = item.id;
+        item.button.setAttribute('aria-pressed',String(item.link.getAttribute('aria-current') === 'page'));
+        item.link.replaceWith(item.button);item.link = null;
+      }
+      if (body) {form.replaceChildren(...body.childNodes);body = null;toolbar = null;}
+      if (findingSearchPosition) {
+        const {button,parent,next}=findingSearchPosition;parent.insertBefore(button,next);
+        findingSearchPosition=null;
+      }
+      if (findingFormNodes) $('achados-form').replaceChildren(...findingFormNodes);
+      findingControls = null;findingFormNodes = null;
+      form.classList.remove('desktop-composer-closed');
+      $('selecao-acervo').classList.remove('desktop-scope-ready');
+      document.querySelector('.feedback-selection').classList.remove('desktop-no-selection');
+      for (const item of savedDetails || []) {item.node.open = item.open;item.node.querySelector('summary').textContent = item.summary;}
+      for (const [field,attrs] of metadata) for (const [name,value] of Object.entries(attrs)) {
+        if (value === null) field.removeAttribute(name);else field.setAttribute(name,value);
+      }
+      metadata.clear();
+      document.documentElement.style.removeProperty('--mesa-header-height');
+      document.documentElement.style.removeProperty('--mesa-composer-height');
+    }
+  }
+  const originalArea = showArea;
+  showArea = name => {originalArea(name);navigationState();geometry();};
+  window.addEventListener('mesa-rota-alterada',navigationState);
+  window.addEventListener('mesa-consulta',event => {if (event.detail.area === 'achados') compactFindings();});
+  for (const id of ['caso','rodada']) $(id).addEventListener('change',() => {
+    if (!desktop.matches) return;
+    $('selecao-acervo').classList.remove('desktop-scope-ready');
+    $('acervo-escolha').querySelector('summary').textContent = 'Escolher análise e conjunto de documentos';
+    $('acervo-escolha').open = true;
+  });
+  new MutationObserver(composerState).observe($('codex-mensagens'),{childList:true,subtree:true});
+  new MutationObserver(composerState).observe(form,{attributes:true,attributeFilter:['hidden'],subtree:true});
+  new MutationObserver(feedbackState).observe($('observacoes-contagem'),{childList:true});
+  $('codex-pergunta').addEventListener('input',() => {if (body) renderComposer();});
+  desktop.addEventListener('change',activate);
+  activate();
+})();
+
+'use strict';
+// Presentation layer. Operational modules keep ownership of scope, writes and evidence.
+(() => {
+  const icons = {
+    inicio:'m3 10 9-7 9 7v10H14v-7h-4v7H3z',
+    cadastro:'M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6',
+    documentos:'M8 3h8l4 4v14H8zM16 3v5h4M4 7v14M11 12h6M11 16h6',
+    codex:'M4 4h16v12H9l-5 4zM8 8h8M8 12h5',
+    achados:'m12 3 8 4v6c0 4-8 8-8 8s-8-4-8-8V7zM8 12l3 3 5-6',
+    apuracao:'M3 4h7l2 2 2-2h7v15h-7l-2 2-2-2H3zM12 6v15',
+    diligencias:'M5 21V3h13l-2 4 2 4H5',
+    gerenciar:'M3 6h7l2 3h9v11H3z',
+    plus:'M12 5v14M5 12h14',menu:'M4 6h16M4 12h16M4 18h16'
+  };
+  const labels={inicio:'Visão geral',cadastro:'Cadastrar arquivos',documentos:'Documentos',codex:'Perguntar à IA',achados:'Conferir achados',apuracao:'Caderno',diligencias:'Diligências',gerenciar:'Apurações e lixeira'};
+  const titles={
+    inicio:['CLAREZA PARA INVESTIGAR','Sua próxima reportagem começa aqui.','Documentos organizados, perguntas com contexto e fontes sempre à mão.'],
+    cadastro:['PRIMEIRO, AS FONTES','Reúna os documentos.','Cadastre cada envio e confira o recebimento antes de perguntar.'],
+    documentos:['SEU ACERVO','Documentos, com tudo no lugar.','Cadastre, pesquise e volte ao original sem perder o contexto.'],
+    codex:['CONVERSA COM O ACERVO','Pergunte. Explore. Volte à fonte.','Converse com os documentos desta apuração. A análise da IA acontece online.'],
+    achados:['A FONTE ANTES DA CONCLUSÃO','Confira o que os documentos sustentam.','Afirmação, evidência e limite de interpretação no mesmo lugar.'],
+    apuracao:['ONDE A HISTÓRIA TOMA FORMA','Seu caderno de apuração.','Notas, redação e trechos com fonte, no mesmo espaço.'],
+    caderno:['CONTRIBUIÇÕES HUMANAS','Suas leituras também fazem parte da história.','Guarde trechos, registre achados e construa cruzamentos com autoria humana identificada.'],
+    diligencias:['O QUE AINDA FALTA SABER','Transforme pendências em próximos passos.','Acompanhe solicitações e retome a pergunta quando houver novas fontes.'],
+    gerenciar:['CUIDE DO SEU ESPAÇO','Suas apurações, organizadas.','Retome uma pauta ou restaure um item movido para a lixeira.']
+  };
+  let inventory=null, loadedCase=null, sequence=0, loading=false;
+  const scopePanel=$('selecao-acervo');
+  const svg=name=>{const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('aria-hidden','true');s.classList.add('mesa-icon');const p=document.createElementNS(s.namespaceURI,'path');p.setAttribute('d',icons[name]||icons.documentos);s.append(p);return s;};
+  const text=(id,value)=>{if($(id).textContent!==value)$(id).textContent=value;};
+  const active=()=>new URL(location.href).searchParams.get('area')||'inicio';
+  const current=()=>window.contextoCaso?.()||'';
+  const navigate=name=>showArea(name);
+  function closeMenu(){document.body.classList.remove('mesa-menu-open');$('mesa-menu').setAttribute('aria-expanded','false');$('mesa-menu').setAttribute('aria-label','Abrir navegação');}
+  function navigation(){
+    for(const [name,label]of Object.entries(labels)){
+      const node=$('ver-'+name);if(!node)continue;
+      if(!node.querySelector('.mesa-icon')){node.replaceChildren(svg(name),element('span',label));}
+      const selected=active()===name||name==='apuracao'&&active()==='caderno';
+      // aria-pressed remains owned by legacy buttons; anchors use aria-current.
+      if(node.tagName==='A'){if(selected)node.setAttribute('aria-current','page');else node.removeAttribute('aria-current');}
+      else node.setAttribute('aria-pressed',String(selected));
+    }
+    document.querySelectorAll('a[data-mesa-area]').forEach(a=>a.href=window.enderecoAreaMesa(a.dataset.mesaArea));
+  }
+  function tab(){
+    const search=$('documentos-aba').value==='pesquisa';
+    $('mesa-acervo').hidden=search;$('mesa-pesquisa').hidden=!search;
+    $('mesa-aba-acervo').setAttribute('aria-pressed',String(!search));$('mesa-aba-pesquisa').setAttribute('aria-pressed',String(search));
+    if(active()==='documentos'){if(scopePanel.parentElement!==$('mesa-pesquisa'))$('mesa-pesquisa').prepend(scopePanel);scopePanel.hidden=!search;}
+    else if(scopePanel.parentElement===$('mesa-pesquisa')){$('area-documentos').before(scopePanel);scopePanel.hidden=active()!=='achados';}
+  }
+  function chooseTab(value){$('documentos-aba').value=value;$('documentos-aba').dispatchEvent(new Event('change'));tab();}
+  function home(){
+    const target=$('mesa-retomada'),caseData=cases.find(c=>c.id===current());target.replaceChildren();
+    if(!caseData){target.append(element('h3','Escolha sua próxima história.'),element('p','Selecione uma apuração no topo da mesa para retomar seu trabalho.'));return;}
+    const info=element('div'),next=element('div',undefined,'mesa-resume-next');
+    info.append(element('p','APURAÇÃO SELECIONADA','eyebrow'),element('h3',caseData.titulo));
+    const counts=[inventory?Leitura.quantidade(inventory.total_documentos,'documento'):'Documentos aguardando conferência',Leitura.quantidade(caseData.rodadas.length,'análise')];
+    info.append(element('p',counts.join(' · '),'small'));
+    next.append(element('p','SUA PRÓXIMA AÇÃO','eyebrow'),element('p',caseData.rodadas.length?'Retome a conversa e confira as fontes antes de avançar.':'Confira o recebimento dos documentos e faça sua primeira pergunta.'));
+    const button=element('button','Retomar trabalho →');button.type='button';button.addEventListener('click',()=>$('inicio-retomar').click());next.append(button);target.append(info,next);
+  }
+  function formatBytes(n){if(!Number.isFinite(n))return '';return new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1}).format(n>=1048576?n/1048576:n/1024)+(n>=1048576?' MB':' KB');}
+  function documentTable(){
+    const target=$('mesa-acervo-lista');target.replaceChildren();
+    if(!inventory){const empty=element('div',undefined,'empty');empty.append(element('h2',current()?'O acervo ainda não está disponível.':'Escolha uma apuração para ver seus documentos.'),element('p',current()?'Use Atualizar acervo para tentar novamente.':'Você também pode começar uma nova apuração e cadastrar seu primeiro lote.'));target.append(empty);return;}
+    const query=$('mesa-filtrar-documento').value.toLocaleLowerCase('pt-BR'),gaps=$('mesa-filtrar-leitura').value==='limitacoes';
+    const list=inventory.documentos.filter(d=>Leitura.nome(d).toLocaleLowerCase('pt-BR').includes(query)&&(!gaps||Leitura.lacunas(d).length));
+    const wrapper=element('div',undefined,'mesa-table-wrap'),table=element('table',undefined,'mesa-file-table');
+    const caption=element('caption',`${inventory.titulo} · ${inventory.corpus_id}`,'sr-only');table.append(caption);
+    const head=element('thead'),tr=element('tr');for(const title of ['DOCUMENTO','CONTEÚDO','LEITURA','ORIGINAL']){const th=element('th',title);th.scope='col';tr.append(th);}head.append(tr);table.append(head);
+    const tbody=element('tbody');
+    for(const doc of list){
+      const row=element('tr'),name=element('td'),contents=element('td'),coverage=element('td'),actions=element('td');
+      const label=element('button',Leitura.nome(doc),'mesa-document-name');label.type='button';label.addEventListener('click',()=>openDocument(doc,label));
+      name.append(label,element('small',[doc.id,formatBytes(doc.bytes)].filter(Boolean).join(' · ')));
+      const pdf=doc.extracao_pdf,limited=Leitura.lacunas(doc).length>0;
+      name.append(element('small',pdf?extractionMessage(pdf):'Original preservado','mesa-mobile-coverage'));
+      contents.append(element('span',pdf?.paginas_pdf!=null?Leitura.quantidade(pdf.paginas_pdf,'página'):(doc.nome_recebido.split('.').pop()||'Arquivo').toUpperCase()));
+      const badge=element('span',pdf?(limited?'Com limitação de extração':'Texto extraído'):'Original preservado',limited?'mesa-pill warning':'mesa-pill');coverage.append(badge);
+      if(pdf)coverage.append(element('small',extractionMessage(pdf)));
+      const open=element('button','Conferir original','secondary');open.type='button';open.addEventListener('click',()=>openDocument(doc,open));actions.append(open);
+      row.append(name,contents,coverage,actions);tbody.append(row);
+    }
+    table.append(tbody);wrapper.append(table);target.append(wrapper);
+    if(!list.length)target.append(element('p',inventory.documentos.length?'Nenhum documento nesta seleção. Tente outro nome ou remova o filtro.':'Nenhum documento cadastrado. Adicione o primeiro lote.','mesa-table-empty'));
+    target.append(element('p',`${Leitura.quantidade(list.length,'documento')} nesta seleção · ${inventory.corpus_id}`,'mesa-table-foot'));
+  }
+  async function openDocument(doc,button){
+    const caseId=current(),ticket=sequence;button.disabled=true;$('mesa-acervo-erro').hidden=true;
+    try{
+      const bundle=await api('caderno-documentos',{caso:caseId});if(ticket!==sequence||caseId!==current())return;
+      const found=bundle.documentos.find(d=>d.documento_id===doc.id&&d.sha256===doc.sha256);
+      if(!found)throw new Error('O conjunto de documentos mudou. Atualize o acervo antes de abrir o original.');
+      const blob=await api('caderno-original',{caso:caseId,origem_id:bundle.origem_id,documento_id:doc.id,documento_sha256:doc.sha256},true);
+      if(ticket===sequence&&caseId===current())await window.abrirOriginal(blob,doc.nome_recebido);
+    }catch(error){if(ticket===sequence){$('mesa-acervo-erro').textContent=error.message;$('mesa-acervo-erro').hidden=false;}}
+    finally{button.disabled=false;}
+  }
+  async function loadInventory(force=false){
+    const caseId=current();if(!force&&loadedCase===caseId)return;
+    const ticket=++sequence;loadedCase=caseId;inventory=null;loading=!!caseId;$('mesa-acervo-erro').hidden=true;
+    $('mesa-atualizar-acervo').disabled=loading;
+    $('mesa-filtrar-documento').value='';$('mesa-filtrar-leitura').value='todos';documentTable();home();
+    if(!caseId){text('mesa-acervo-status','Selecione a apuração no topo da mesa.');text('mesa-versao','Documentos, achados e fontes');return;}
+    text('mesa-acervo-status','Conferindo os documentos cadastrados…');text('mesa-versao','Conferindo acervo…');
+    try{
+      const result=await api('inventario',{caso:caseId});if(ticket!==sequence||caseId!==current())return;
+      inventory=result;documentTable();home();text('mesa-versao',result.corpus_id);text('mesa-acervo-status',`${Leitura.quantidade(result.total_documentos,'documento')} cadastrado(s). Os originais estão preservados; a extração não substitui a conferência.`);
+    }catch(error){if(ticket===sequence){$('mesa-acervo-erro').textContent=error.message;$('mesa-acervo-erro').hidden=false;text('mesa-acervo-status','A conferência do acervo falhou. Isso não equivale a um acervo vazio.');text('mesa-versao','Acervo indisponível');}}
+    finally{if(ticket===sequence){loading=false;$('mesa-atualizar-acervo').disabled=false;}}
+  }
+  function sync(){
+    const area=active(),copy=titles[area];if(copy){['area-etiqueta','area-titulo','area-descricao'].forEach((id,i)=>text(id,copy[i]));}
+    document.body.dataset.mesaArea=area;navigation();tab();
+    const stages=[['cadastro','Documentos'],['codex','Pergunta'],['achados','Conferência'],['apuracao','Caderno']],stage={cadastro:0,documentos:0,codex:1,achados:2,apuracao:3,caderno:3}[area];
+    $('mesa-etapas').hidden=stage===undefined;
+    if(stage!==undefined&&$('mesa-etapas').dataset.stage!==String(stage)){$('mesa-etapas').dataset.stage=String(stage);$('mesa-etapas').replaceChildren(...stages.map(([name,label],i)=>{const a=element('a');a.href=window.enderecoAreaMesa(name);a.dataset.mesaArea=name;a.append(element('span',String(i+1)),document.createTextNode(label));if(i===stage)a.setAttribute('aria-current','step');return a;}));}
+    closeMenu();if(['inicio','documentos'].includes(area))loadInventory();
+  }
+  $('mesa-menu').replaceChildren(svg('menu'));
+  $('ver-cadastro').before($('ver-documentos'));
+  $('mesa-menu').addEventListener('click',()=>{const open=document.body.classList.toggle('mesa-menu-open');$('mesa-menu').setAttribute('aria-expanded',String(open));$('mesa-menu').setAttribute('aria-label',open?'Fechar navegação':'Abrir navegação');});
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&document.body.classList.contains('mesa-menu-open')){closeMenu();$('mesa-menu').focus();}});
+  document.addEventListener('click',event=>{
+    const link=event.target.closest('a[data-mesa-area]');
+    if(link&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey&&event.button===0){event.preventDefault();navigate(link.dataset.mesaArea);}
+    if(document.body.classList.contains('mesa-menu-open')&&!event.target.closest('.sidebar,#mesa-menu'))closeMenu();
+  });
+  for(const id of ['mesa-nova']){$(id).prepend(svg('plus'));$(id).addEventListener('click',()=>$('inicio-nova').click());}
+  $('mesa-adicionar').addEventListener('click',()=>$('inicio-adicionar').click());
+  $('mesa-aba-recibo').addEventListener('click',()=>navigate('cadastro'));
+  $('mesa-perguntar').addEventListener('click',()=>{if(!current()){$('contexto-caso').focus();return;}navigate('codex');window.abrirComposicaoMesa?.();});
+  $('mesa-aba-acervo').addEventListener('click',()=>chooseTab('acervo'));
+  $('mesa-aba-pesquisa').addEventListener('click',()=>chooseTab('pesquisa'));
+  $('documentos-aba').addEventListener('change',tab);
+  $('mesa-filtrar-documento').addEventListener('input',documentTable);$('mesa-filtrar-leitura').addEventListener('change',documentTable);
+  $('mesa-atualizar-acervo').addEventListener('click',()=>loadInventory(true));
+  window.addEventListener('mesa-rota-alterada',sync);
+  window.addEventListener('catalogo-carregado',()=>{home();sync();});
+  window.addEventListener('acervo-alterado',()=>{loadedCase=null;if(['inicio','documentos'].includes(active()))loadInventory(true);});
+  $('contexto-caso').addEventListener('change',()=>{loadedCase=null;loadInventory();});
+  const preview=$('apuracao-previa'),previewHeading=preview.previousElementSibling;
+  const previewDetails=element('details',undefined,'mesa-note-preview');
+  previewDetails.append(element('summary','Pré-visualizar a redação'));previewHeading.replaceWith(previewDetails);previewDetails.append(preview);
+  const notebookActions=$('apuracao-nova').parentElement;
+  notebookActions.append($('apuracao-atualizar'));
+  const diligenceHeading=element('div',undefined,'section-heading');
+  $('diligencias-titulo').before(diligenceHeading);diligenceHeading.append($('diligencias-titulo'),$('diligencias-nova'));
+  const diligenceFilters=element('details',undefined,'mesa-diligence-options');
+  diligenceFilters.id='mesa-diligencias-filtros';diligenceFilters.append(element('summary','Filtrar diligências'));
+  $('diligencias-filtros').before(diligenceFilters);diligenceFilters.append($('diligencias-filtros'));
+  const diligenceResume=element('details',undefined,'mesa-diligence-options');
+  diligenceResume.id='mesa-diligencias-retomada';diligenceResume.append(element('summary','Conversa e documentos para retomar a questão'));
+  const resumeLabel=$('diligencias-conversa').closest('label');resumeLabel.before(diligenceResume);diligenceResume.append(resumeLabel,$('diligencias-incorporar').closest('label'));
+  let hadSources=false;
+  new MutationObserver(()=>{const hasSources=!!$('codex-fontes').children.length;if(hasSources&&!hadSources&&matchMedia('(min-width:1051px)').matches)$('codex-painel-fontes').open=true;hadSources=hasSources;}).observe($('codex-fontes'),{childList:true});
+  // Refresh the adopted navigation nodes after desktop.js restores them on resize.
+  matchMedia('(min-width:1051px)').addEventListener('change',navigation);
+  for(const field of document.querySelectorAll('input[id],textarea[id],select[id]')){if(!field.name)field.name=field.id;if(!field.hasAttribute('autocomplete')&&['text','search'].includes(field.type))field.autocomplete='off';}
+  const params=new URL(location.href).searchParams;if(!params.has('documentos-aba')&&['consulta','geracao','rodada'].some(k=>params.has(k)))$('documentos-aba').value='pesquisa';
+  sync();
+})();

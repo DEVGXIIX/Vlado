@@ -1,0 +1,604 @@
+{
+  "type": "object",
+  "properties": {
+    "esquema": {
+      "type": "integer",
+      "const": 1
+    },
+    "caso_id": {
+      "type": "string",
+      "pattern": "[a-z0-9][a-z0-9_-]{0,63}"
+    },
+    "rodada": {
+      "type": "string",
+      "pattern": "R[0-9]{3,6}"
+    },
+    "snapshot_sha256": {
+      "type": "string",
+      "pattern": "[a-f0-9]{64}"
+    },
+    "revisao": {
+      "type": "string",
+      "pattern": "[a-z0-9][a-z0-9_-]{0,31}"
+    },
+    "anterior": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "revisao": {
+          "type": "string",
+          "pattern": "[a-z0-9][a-z0-9_-]{0,31}"
+        },
+        "registros_sha256": {
+          "type": "string",
+          "pattern": "[a-f0-9]{64}"
+        }
+      },
+      "required": [
+        "revisao",
+        "registros_sha256"
+      ],
+      "additionalProperties": false
+    },
+    "achados": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "A[0-9]{3,}"
+          },
+          "subquestao": {
+            "type": "string",
+            "minLength": 1
+          },
+          "versoes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "versao": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "redacao": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "natureza": {
+                  "type": "string",
+                  "enum": [
+                    "declaracao_documental",
+                    "alegacao_atribuida",
+                    "inferencia",
+                    "pendencia"
+                  ]
+                },
+                "limitacoes": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "versao",
+                "redacao",
+                "natureza",
+                "limitacoes"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "id",
+          "subquestao",
+          "versoes"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    },
+    "evidencias": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "E[0-9]{3,}"
+          },
+          "documento_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "modo": {
+            "type": "string",
+            "enum": [
+              "indexada",
+              "direta",
+              "visual"
+            ]
+          },
+          "original": {
+            "type": "string",
+            "minLength": 1
+          },
+          "original_sha256": {
+            "type": "string",
+            "pattern": "[a-f0-9]{64}"
+          },
+          "fonte_textual": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fonte_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "[a-f0-9]{64}"
+          },
+          "localizador": {
+            "type": "object",
+            "properties": {
+              "tipo": {
+                "type": "string",
+                "enum": [
+                  "linhas",
+                  "pagina",
+                  "regiao",
+                  "celula"
+                ]
+              },
+              "pagina_pdf": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1
+              },
+              "linha_inicio": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1
+              },
+              "linha_fim": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1
+              },
+              "descricao": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tipo",
+              "pagina_pdf",
+              "linha_inicio",
+              "linha_fim",
+              "descricao"
+            ],
+            "additionalProperties": false
+          },
+          "indice": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "geracao": {
+                "type": "string",
+                "pattern": "[a-z0-9][a-z0-9_-]{0,31}"
+              },
+              "indice_id": {
+                "type": "string",
+                "pattern": "[a-f0-9]{64}"
+              },
+              "banco_sha256": {
+                "type": "string",
+                "pattern": "[a-f0-9]{64}"
+              },
+              "referencia": {
+                "type": "string",
+                "pattern": "[a-f0-9]{64}"
+              }
+            },
+            "required": [
+              "geracao",
+              "indice_id",
+              "banco_sha256",
+              "referencia"
+            ],
+            "additionalProperties": false
+          },
+          "trecho": {
+            "type": "string"
+          },
+          "atribuicao": {
+            "type": "string",
+            "minLength": 1
+          },
+          "contexto": {
+            "type": "string",
+            "minLength": 1
+          },
+          "limitacoes": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "documento_id",
+          "modo",
+          "original",
+          "original_sha256",
+          "fonte_textual",
+          "fonte_sha256",
+          "localizador",
+          "indice",
+          "trecho",
+          "atribuicao",
+          "contexto",
+          "limitacoes"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    },
+    "vinculos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "achado_id": {
+            "type": "string",
+            "pattern": "A[0-9]{3,}"
+          },
+          "versao": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "evidencia_id": {
+            "type": "string",
+            "pattern": "E[0-9]{3,}"
+          },
+          "papel": {
+            "type": "string",
+            "enum": [
+              "suporte",
+              "contradicao",
+              "contexto"
+            ]
+          },
+          "justificativa": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "achado_id",
+          "versao",
+          "evidencia_id",
+          "papel",
+          "justificativa"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    },
+    "revisoes_assistidas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "achado_id": {
+            "type": "string",
+            "pattern": "A[0-9]{3,}"
+          },
+          "versao": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "suporte": {
+            "type": "string",
+            "enum": [
+              "nao_revisado",
+              "sustentado",
+              "parcial",
+              "nao_sustentado",
+              "ilegivel"
+            ]
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fontes_reabertas": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "E[0-9]{3,}"
+            },
+            "minItems": 0
+          },
+          "limitacoes": {
+            "type": "string",
+            "minLength": 1
+          },
+          "acao": {
+            "type": "string",
+            "enum": [
+              "manter",
+              "corrigir",
+              "retirar",
+              "pendencia"
+            ]
+          }
+        },
+        "required": [
+          "achado_id",
+          "versao",
+          "suporte",
+          "motivo",
+          "fontes_reabertas",
+          "limitacoes",
+          "acao"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    },
+    "destinos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "achado_id": {
+            "type": "string",
+            "pattern": "A[0-9]{3,}"
+          },
+          "versao": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "destino": {
+            "type": "string",
+            "enum": [
+              "incluido",
+              "pendencia",
+              "retirado",
+              "substituido"
+            ]
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 1
+          },
+          "briefing": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "revisao_suporte": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          }
+        },
+        "required": [
+          "achado_id",
+          "versao",
+          "destino",
+          "motivo",
+          "briefing",
+          "revisao_suporte"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    },
+    "conferencias_humanas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "achado_id": {
+            "type": "string",
+            "pattern": "A[0-9]{3,}"
+          },
+          "versao": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "retorno_literal_ou_referencia": {
+            "type": "string",
+            "minLength": 1
+          },
+          "alcance": {
+            "type": "string",
+            "minLength": 1
+          },
+          "decisao": {
+            "type": "string",
+            "enum": [
+              "confirmacao",
+              "correcao",
+              "descarte",
+              "pendencia"
+            ]
+          },
+          "responsavel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fontes_informadas": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0
+          }
+        },
+        "required": [
+          "achado_id",
+          "versao",
+          "retorno_literal_ou_referencia",
+          "alcance",
+          "decisao",
+          "responsavel",
+          "fontes_informadas"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    },
+    "verificacao_externa": {
+      "type": "object",
+      "properties": {
+        "estado": {
+          "type": "string",
+          "enum": [
+            "nao_realizada",
+            "informada"
+          ]
+        },
+        "relato": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limitacao": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "estado",
+        "relato",
+        "limitacao"
+      ],
+      "additionalProperties": false
+    },
+    "procedencia": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "etapa": {
+            "type": "string",
+            "enum": [
+              "busca",
+              "revisao",
+              "sintese",
+              "retorno_humano"
+            ]
+          },
+          "artefatos": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0
+          },
+          "ferramentas": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0
+          },
+          "modelo_informado_ou_observado": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "etapa",
+          "artefatos",
+          "ferramentas",
+          "modelo_informado_ou_observado"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1
+    },
+    "artefatos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "arquivo": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "[a-f0-9]{64}"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "evidencias",
+              "cruzamentos",
+              "revisao",
+              "achados_revisados",
+              "briefing",
+              "retorno_humano",
+              "insuficiencia"
+            ]
+          }
+        },
+        "required": [
+          "arquivo",
+          "sha256",
+          "tipo"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    }
+  },
+  "required": [
+    "esquema",
+    "caso_id",
+    "rodada",
+    "snapshot_sha256",
+    "revisao",
+    "anterior",
+    "achados",
+    "evidencias",
+    "vinculos",
+    "revisoes_assistidas",
+    "destinos",
+    "conferencias_humanas",
+    "verificacao_externa",
+    "procedencia",
+    "artefatos"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Achados da IA - conjunto canonico v1",
+  "description": "Validacao tecnica; nao certifica suporte semantico ou conferencia humana. Historicos append-only."
+}

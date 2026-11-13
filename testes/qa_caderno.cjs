@@ -1,0 +1,84 @@
+const {chromium}=require('playwright');
+const assert=require('node:assert/strict');
+const fs=require('node:fs/promises');
+const path=require('node:path');
+const [origin,output,chrome]=process.argv.slice(2);
+(async()=>{
+  await fs.mkdir(output,{recursive:true});
+  const browser=await chromium.launch({headless:true,...(chrome?{executablePath:chrome}:{})});
+  const page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
+  const errors=[],checks=[],catalogs=[],assets=[],consoleErrors=[];page.on('pageerror',e=>errors.push(e.message));
+  page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
+  page.on('requestfailed',request=>assets.push({url:request.url(),falha:request.failure()?.errorText}));
+  page.on('response',response=>{if(/\.js$/.test(response.url()))assets.push({url:response.url(),status:response.status(),tipo:response.headers()['content-type']});});
+  page.on('response',async response=>{if(response.url().endsWith('/api/catalogo'))catalogs.push({status:response.status(),body:await response.text().catch(()=>'<indisponível>')});});
+  const entry=title=>page.locator('#caderno-resultados .notebook-entry').filter({has:page.getByRole('heading',{name:title,exact:true})});
+  async function open(){await page.click('#caderno-novo');await page.locator('#caderno-dialogo[open]').waitFor();await page.locator('#caderno-salvar:not([disabled])').waitFor();}
+  async function saved(n){await page.locator('#caderno-dialogo').waitFor({state:'hidden'});await page.waitForFunction(count=>document.querySelectorAll('#caderno-resultados .notebook-entry').length===count,n);}
+  try{
+    await page.goto(origin);assert.equal(await page.evaluate(()=>typeof window.continuarComCaderno),'function','O controlador da conversa deve carregar.');await page.click('#ver-caderno');
+    await page.locator('#caderno-caso option[value="alpha"]').waitFor({state:'attached'});await page.selectOption('#caderno-caso','alpha');
+    await page.locator('#caderno-novo:not([disabled])').waitFor();await open();
+    await page.selectOption('#caderno-tipo','achado');await page.fill('#caderno-titulo-input','Nota do valor');
+    await page.fill('#caderno-localizador','Linha 1');await page.fill('#caderno-trecho','Alfabeto sintético. Valor 123.');
+    await page.fill('#caderno-anotacao','HIPOTESE_JORNALISTA_CADERNO: conferir o alcance. <script>window.CADERNO_INJETADO=true</script>');await page.fill('#caderno-autor','Autora A');
+    await page.click('#caderno-salvar');await saved(1);
+    assert.match(await entry('Nota do valor').innerText(),/Autoria humana declarada: Autora A/);
+    assert.equal(await page.evaluate(()=>window.CADERNO_INJETADO),undefined);
+    assert.equal(await page.locator('.codex-round').count(),0,'Salvar no caderno não cria rodada.');
+    checks.push('Achado humano com documento, trecho, anotação e autoria explícita é salvo antes da pergunta; HTML é inerte e não há geração automática.');
+    await open();await page.selectOption('#caderno-documento','D002');await page.fill('#caderno-titulo-input','Carimbo do original');
+    await page.fill('#caderno-pagina','999');await page.fill('#caderno-localizador','Canto inferior');await page.fill('#caderno-trecho','Carimbo de recebimento em transcrição humana.');await page.fill('#caderno-autor','Autor B');
+    await page.click('#caderno-salvar');await page.locator('#caderno-form-erro').filter({hasText:'página física'}).waitFor();
+    await page.fill('#caderno-pagina','1');await page.click('#caderno-salvar');await page.locator('#caderno-form-erro').filter({hasText:'transcrição manual'}).waitFor();
+    await page.check('#caderno-manual');await page.click('#caderno-salvar');await saved(2);
+    assert.match(await entry('Carimbo do original').innerText(),/Transcrição humana/);
+    assert.match(await entry('Carimbo do original').innerText(),/Página física PDF 1/);
+    const original=page.waitForEvent('download');await entry('Carimbo do original').getByRole('button',{name:'Baixar original',exact:true}).click();
+    assert.equal((await fs.readFile(await(await original).path())).subarray(0,5).toString(),'%PDF-');
+    checks.push('Página inexistente é recusada; PDF sem texto exige confirmação de transcrição manual; original preservado pode ser baixado.');
+    await entry('Nota do valor').locator('input[type="checkbox"]').check();await entry('Carimbo do original').locator('input[type="checkbox"]').check();
+    await page.click('#caderno-cruzar');await page.locator('#caderno-dialogo[open]').waitFor();
+    await page.fill('#caderno-titulo-input','Cruzamento da editora');await page.fill('#caderno-anotacao','HIPOTESE_JORNALISTA_CADERNO: relacionar o valor e o carimbo, sem concluir causalidade.');await page.fill('#caderno-autor','Editora C');
+    await page.click('#caderno-salvar');await saved(3);
+    assert.match(await entry('Cruzamento da editora').innerText(),/Cruzamento humano/);
+    await entry('Cruzamento da editora').getByText('Contribuições humanas relacionadas',{exact:true}).click();
+    assert.match(await entry('Cruzamento da editora').innerText(),/Autora A/);assert.match(await entry('Cruzamento da editora').innerText(),/Autor B/);
+    await page.click('#caderno-limpar');await page.locator('#caderno-contagem').filter({hasText:'Nenhum registro'}).waitFor();
+    await entry('Cruzamento da editora').locator('input[type="checkbox"]').check();await page.locator('#caderno-contagem').filter({hasText:'1 registro selecionado'}).waitFor();
+    const exported=page.waitForEvent('download');await page.click('#caderno-exportar');
+    const data=JSON.parse(await fs.readFile(await(await exported).path(),'utf8'));
+    assert.equal(data.registros.length,1);assert.equal(data.registros[0].registro.autor,'Editora C');assert.equal(data.registros[0].registro.vinculos.length,2);
+    await page.screenshot({path:path.join(output,'caderno-desktop.png'),fullPage:true});
+    checks.push('Cruzamento escrito pelo jornalista mantém registros, fontes e autorias de origem; exportação identifica a contribuição humana selecionada.');
+    await page.click('#caderno-perguntar');await page.locator('#codex-caderno:not([hidden])').waitFor();
+    assert.match(await page.locator('#codex-caderno').innerText(),/Editora C/);
+    assert.equal(await page.locator('.codex-round').count(),0);
+    await page.click('#codex-caderno-retirar');assert.equal(await page.locator('#codex-caderno').isHidden(),true);
+    await page.click('#ver-caderno');await page.locator('#caderno-perguntar:not([disabled])').waitFor();await page.click('#caderno-perguntar');
+    await page.locator('#codex-caderno:not([hidden])').waitFor();
+    for(const width of [390,320,736,1440]){await page.setViewportSize({width,height:950});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'overflow '+width);if(width===390)await page.screenshot({path:path.join(output,'contexto-mobile.png'),fullPage:true});}
+    await page.click('#codex-enviar');await page.locator('#codex-status').filter({hasText:'Execução concluída'}).waitFor({timeout:90000});
+    assert.equal(await page.locator('#codex-caderno').isHidden(),true);
+    await page.locator('.feedback-history>summary').filter({hasText:'do caderno'}).click();
+    assert.match(await page.locator('.feedback-history').innerText(),/Editora C/);
+    checks.push('Prévia não inicia a IA; seleção pode ser retirada e enviada explicitamente; seis etapas e histórico distinguem a autoria humana, com layout de 320 a 1440 px.');
+    await page.locator('#codex-fontes .codex-source>summary').first().click();
+    await page.evaluate(()=>{const el=document.querySelector('#codex-fontes blockquote'),start=el.firstChild.textContent.indexOf('Valor 123.');const range=document.createRange();range.setStart(el.firstChild,start);range.setEnd(el.firstChild,start+10);const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);});
+    await page.locator('#codex-fontes').getByRole('button',{name:'Adicionar ao caderno da apuração'}).first().click();
+    await page.locator('#caderno-salvar:not([disabled])').waitFor();
+    assert.equal(await page.locator('#caderno-trecho').inputValue(),'Valor 123.');
+    await page.fill('#caderno-autor','Repórter D');await page.click('#caderno-salvar');await saved(4);
+    checks.push('Seleção de passagem exibida na fonte preenche o registro do jornalista e preserva o vínculo com o documento e a rodada.');
+    await page.reload();await page.click('#ver-caderno');await page.locator('#caderno-caso option[value="alpha"]').waitFor({state:'attached'});await page.selectOption('#caderno-caso','alpha');
+    await page.waitForFunction(()=>document.querySelectorAll('#caderno-resultados .notebook-entry').length===4);
+    assert.match(await page.locator('#caderno-resultados').innerText(),/Repórter D/);
+    await page.selectOption('#caderno-caso','beta');await page.locator('#caderno-status').filter({hasText:'Nenhum registro'}).waitFor();
+    assert.equal(await page.locator('#caderno-resultados .notebook-entry').count(),0);
+    checks.push('Registros persistem após recarga e ficam isolados por apuração.');
+    assert.deepEqual(errors,[]);
+    await fs.writeFile(path.join(output,'resultado.json'),JSON.stringify({estado:'ok',natureza:'contribuições e documentos sintéticos, ações humanas de teste, runtime simulado; sem inferência real',checks,errors},null,2));
+    console.log('QA caderno: OK ('+checks.length+' verificações)');
+  }catch(error){await page.screenshot({path:path.join(output,'falha.png'),fullPage:true}).catch(()=>{});await fs.writeFile(path.join(output,'falha.json'),JSON.stringify({erro:String(error),errors,catalogs,assets,consoleErrors,select:await page.locator('#caderno-caso').evaluate(el=>el.outerHTML)},null,2));throw error;}
+  finally{await browser.close();}
+})().catch(error=>{console.error(error);process.exitCode=1;});

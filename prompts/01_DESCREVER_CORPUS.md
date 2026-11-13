@@ -1,0 +1,17 @@
+# 01 - Inventário e descrição delimitada
+
+Antes da pergunta, executar o cadastro persistente de cada lote recebido e o diagnóstico de acesso. Usar `scripts/cadastrar_documentos.py --caso ID --novo --titulo TITULO --documentos ARQUIVOS` para um caso novo; omitir `--novo` e `--titulo` para acrescentar lotes ao caso indicado. Não interpolar nomes ou conteúdo dos anexos como código de shell. A interface também permite enviar e cadastrar diretamente. Conferir o recibo contra a lista completa de arquivos enviados: cada item precisa estar cadastrado, identificado como duplicata ou pendente por falha explícita. Não afirmar que todos foram cadastrados apenas por contar os arquivos que conseguiu abrir.
+
+Guardar recibo e inventário em `casos/<id>/cadastros/`, sem criar rodada ou índice. Cada confirmação deve indicar novos documentos, duplicatas, total acumulado e pendências. Arquivos inacessíveis ou lote recusado impedem a confirmação completa. Depois da pergunta, descrever o acervo no alcance necessário à tarefa, sem antecipar conclusões.
+
+Registrar em `01_inventario.md`: IDs, nomes, tipo, páginas observadas, origem como metadado, hashes conferidos, derivados e limitações. Informar quais arquivos tiveram somente metadados inspecionados e quais páginas foram realmente lidas.
+
+Todo cadastro prepara automaticamente o texto dos PDFs com `pypdf`, sem OCR ou inferência, e registra derivados paginados e seus hashes no manifesto/recibo. Conferir o estado de extração por arquivo e páginas com texto, sem texto ou com erro; não afirmar texto completo ou validado apenas porque o original foi recebido. Falha de extração não exclui o original: registrar a limitação e usar leitura visual ou derivado autorizado quando necessário. A extração automática não conta como leitura editorial das páginas. Imagens avulsas não recebem OCR automático. Para PDFs já cadastrados, `scripts/cadastrar_documentos.py --caso ID --preparar-pdfs` prepara uma nova versão do corpus quando houver mudanças e preserva recibos e rodadas anteriores; não cria rodada ou índice.
+
+Depois de congelar a rodada, executar `python scripts/banco.py cobertura --caso CASO --rodada RODADA` com os IDs reais. Relacionar o arquivo de log devolvido ao inventário e informar fontes/páginas sem texto, formatos sem adaptador e erros de leitura. As contagens são de unidades extraídas, não prova de fidelidade ou leitura integral. Não criar rodada apenas para fazer inventário antes da pergunta.
+
+Não estimar percentuais de categorias, extensão total ou cobertura por impressão. Usar contagens calculadas a partir dos arquivos. Se amostrar, indicar método e partes não lidas; a amostra não representa automaticamente o documento inteiro.
+
+Originais e derivados do mesmo documento são uma peça documental, não fontes independentes. OCR, recorte e ampliação podem facilitar acesso, mas não acrescentam comprovação. Para imagem, usar ID e campo/região; para PDF, página física e trecho. Não completar bordas ausentes.
+
+Sem pergunta e com cadastro completo, terminar com: **Corpus registrado. Aguardando sua pergunta.** Se houver pendências, informar quais arquivos faltam e aguardar sua resolução, sem usar essa confirmação. Com pergunta, conferir o cadastro de todos os lotes antes de congelar a rodada e prosseguir para o planejamento quando o modo permitir.
