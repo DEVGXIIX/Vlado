@@ -2,7 +2,15 @@
 (() => {
   let state=null, noteId=null, dirty=false, busy=false, pending=null, sequence=0, saveAttempt=null, dialogSequence=0;
   const dialog=$('apuracao-adicionar-dialogo');
-  const editor=new EditorNotas(changed);
+  // If editor_notas.js itself failed to load, the Markdown field still edits and saves.
+  function plainEditor(onInput){
+    $('apuracao-texto').addEventListener('input',onInput);
+    $('apuracao-vditor').hidden=true;$('apuracao-texto-alternativo').hidden=false;
+    $('apuracao-editor-aviso').textContent='O editor visual não carregou. Você pode editar e salvar o Markdown abaixo.';
+    $('apuracao-editor-aviso').hidden=false;
+    return {open(text){$('apuracao-texto').value=text;},flush(){},disabled(){}};
+  }
+  const editor=window.EditorNotas?new window.EditorNotas(changed):plainEditor(changed);
   const uid=()=>crypto.randomUUID().replaceAll('-','');
   function error(message=''){$('apuracao-erro').textContent=message;$('apuracao-erro').hidden=!message;}
   function dialogError(message=''){$('apuracao-adicionar-erro').textContent=message;$('apuracao-adicionar-erro').hidden=!message;}

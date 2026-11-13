@@ -6,7 +6,6 @@
   <meta name="session-token" content="__SESSION_TOKEN__">
   <title>Vlado</title>
   <meta name="theme-color" content="#171d1a">
-  <link rel="stylesheet" href="/vendor/vditor/dist/index.css">
   <link rel="stylesheet" href="/style.css">
   <link rel="preload" href="/fonts/SourceSans3-Upright.otf" as="font" type="font/otf" crossorigin media="(min-width: 1051px)">
   <script src="/i18n_en.js" defer></script>
@@ -17,10 +16,6 @@
   <script src="/observacoes.js" defer></script>
   <script src="/continuidade.js" defer></script>
   <script src="/caderno.js" defer></script>
-  <script src="/vendor/vditor/dist/index.min.js" defer></script>
-  <script id="vditorLuteScript" src="/vendor/vditor/dist/js/lute/lute.min.js" defer></script>
-  <script src="/vendor/vditor/dist/js/i18n/pt_BR.js" defer></script>
-  <script id="vditorIconScript" src="/vendor/vditor/dist/js/icons/ant.js" defer></script>
   <script src="/editor_notas.js" defer></script>
   <script src="/apuracao.js" defer></script>
   <script src="/diligencias.js" defer></script>
@@ -120,6 +115,7 @@
           <span id="apuracao-texto-rotulo">Texto da nota</span>
           <p id="apuracao-editor-ajuda" class="small">Escreva com formatação visual. Use “Alternar modo de edição” na barra para renderização instantânea ou Markdown. Salve para guardar suas alterações.</p>
           <p id="apuracao-editor-aviso" class="small" role="status" hidden></p>
+          <button id="apuracao-editor-tentar" type="button" class="secondary" hidden>Tentar carregar o editor de novo</button>
           <div id="apuracao-vditor" aria-labelledby="apuracao-texto-rotulo" aria-describedby="apuracao-editor-ajuda"></div>
           <label id="apuracao-texto-alternativo" hidden>Texto em Markdown<textarea id="apuracao-texto" rows="16" maxlength="200000"></textarea></label>
           <div class="actions"><button id="apuracao-salvar">Salvar nota</button><button id="apuracao-excluir" type="button" class="secondary">Excluir nota</button></div>
