@@ -52,6 +52,8 @@ test('citação da resposta mostra a página e abre o original nela, com um cliq
   assert.equal(chip.tagName, 'BUTTON');
   assert.equal(chip.textContent, 'p. 12');
   assert.equal(chip.getAttribute('aria-label'), 'Ver página 12 no original: contrato');
+  assert.equal(chip.parentElement.className, 'citation-keep', 'a pontuação seguinte não começa a linha sozinha');
+  assert.equal(chip.parentElement.textContent, 'p. 12.');
   chip.click();
   await mesa.esperar(8);
   const pedido = mesa.chamadas.find(c => c.operacao === 'codex-original');

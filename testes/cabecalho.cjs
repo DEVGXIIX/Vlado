@@ -31,6 +31,16 @@ for (const desktop of [true, false]) {
   });
 }
 
+test('no celular, idioma, tema e saída vão para a gaveta e o seletor de apuração fica no cabeçalho', async () => {
+  const celular = await abrir('?area=codex', false);
+  for (const id of ['mesa-idioma', 'mesa-sair', 'mesa-tema']) {
+    assert.ok(celular.$(id).closest('#mesa-sidebar .mesa-drawer-controls'), `${id} na gaveta`);
+  }
+  assert.ok(celular.$('contexto-caso').closest('.app-header'));
+  const desktop = await abrir('?area=codex', true);
+  for (const id of ['mesa-idioma', 'mesa-sair', 'mesa-tema']) assert.ok(desktop.$(id).closest('.app-header'), `${id} no cabeçalho`);
+});
+
 test('troca de apuração não repete o nome acima do título', async () => {
   const mesa = await abrir('?area=documentos');
   mesa.janela.definirContextoCaso('alfa');

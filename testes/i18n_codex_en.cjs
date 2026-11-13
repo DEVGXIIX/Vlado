@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const {criarMesa} = require('./dom_minimo.cjs');
 
 const ALFA = {id: 'alfa', titulo: 'Pauta Alfa', rodadas: [{id: 'R001', geracoes: []}]};
-const PORTUGUES = /[ãõçáàâêéíóôú]|\b(não|uma|para|com|sua|seu|você|pergunta|perguntas|apuração|apurações|conversa|conversas|documento|documentos|fonte|fontes|selecione|escolha|nenhum|nenhuma|enviar|conferir|página|achado|achados|rodada|análise|linhas?|das|dos|da|de)\b/i;
+const PORTUGUES = /[ãõçáàâêéíóôú]|\b(não|uma|para|com|sua|seu|você|pergunta|perguntas|apuração|apurações|conversa|conversas|documento|documentos|fonte|fontes|selecione|escolha|nenhum|nenhuma|enviar|conferir|página|achado|achados|rodada|análise|linhas?|resposta|andamento|consultar|pronto|das|dos|da|de)\b/i;
 const DADOS = '[translate="no"], blockquote, pre, code, .markdown-body, .vditor, [contenteditable="true"], textarea, script, style';
 const PERMITIDOS = new Set(['Vlado', 'Anthropic (Claude)', 'OpenAI (GPT)']);
 

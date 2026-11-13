@@ -149,6 +149,8 @@ window.VLADO_I18N_EN = {
     "API indisponível.": "API unavailable.",
     "Conexão da interface interrompida": "Interface connection interrupted",
     "Atualização de andamento": "Progress update",
+    "Resposta": "Answer",
+    "IA · em andamento": "AI · in progress",
     "Atualização de andamento disponível. A análise continua.": "Progress update available. The analysis continues.",
     "Atualizações de andamento": "Progress updates",
     "Atualizações de andamento da IA": "AI progress updates",

@@ -242,6 +242,7 @@ body[data-modo="piloto"] #codex-desligar{display:none}
 .markdown-body .source-citation:hover{background:var(--theme-active,#e4e7dd);border-color:var(--green)}
 .markdown-body .source-citation:disabled{opacity:.7;cursor:progress}
 @media(pointer:coarse){.markdown-body .source-citation{padding:4px 8px}}
+.citation-keep{white-space:nowrap}
 .codex-source>button:not(.secondary){margin-right:6px}
 /* Finding detail: claim, verdicts, then the evidence; metadata trails. */
 .finding-detail>h3:first-child{margin-top:0}
@@ -264,6 +265,10 @@ body[data-modo="piloto"] #codex-desligar{display:none}
 .intro>#area-descricao{margin:0;max-width:60ch;padding-left:14px;border-left:1px solid var(--theme-input-line,#c8d0c4);font-size:15px;line-height:1.4;color:var(--muted);overflow-wrap:anywhere}
 main:has(#area-achados:not([hidden])) .intro{margin-bottom:16px}
 @media(max-width:720px){.intro{margin-bottom:18px}.intro h1{font-size:26px;letter-spacing:-.4px}.intro>#area-descricao{font-size:14px}}
+/* Phone drawer: interface settings and sign-out live under the navigation. */
+.mesa-drawer-controls{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0;padding-top:16px;border-top:1px solid var(--line)}
+.mesa-drawer-controls>button{flex:1 1 auto;min-height:44px}
+@media(max-width:720px){.persistent-context>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 /* Home: a plain first step instead of a hero. */
 .mesa-primeiro-passo{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:0}
 .mesa-primeiro-passo h2{font-size:23px;margin:0 0 6px}

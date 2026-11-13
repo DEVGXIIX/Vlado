@@ -189,6 +189,21 @@
   activate();
 })();
 
+// Phones: language, theme and sign-out move into the navigation drawer, leaving the
+// header to the menu and the investigation selector.
+(() => {
+  const phone = matchMedia('(max-width: 720px)');
+  const header = document.querySelector('.app-header');
+  const controls = ['mesa-idioma','mesa-sair','mesa-tema'].map(id => $(id));
+  const drawer = element('div', undefined, 'mesa-drawer-controls');
+  function place() {
+    if (phone.matches) { drawer.append(...controls); $('mesa-sidebar').querySelector('.areas').after(drawer); }
+    else { header.append(...controls); drawer.remove(); }
+  }
+  phone.addEventListener('change', place);
+  place();
+})();
+
 'use strict';
 // Presentation layer. Operational modules keep ownership of scope, writes and evidence.
 (() => {

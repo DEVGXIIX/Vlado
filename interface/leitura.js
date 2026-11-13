@@ -80,7 +80,14 @@ window.Leitura = (() => {
       }
       if (text.startsWith('[fonte:', i)) {
         const match = /^\[fonte:([^\]\n]{1,200})\]/.exec(text.slice(i));
-        if (match && citation) { flush(); parent.append(citation(match[1])); i += match[0].length; continue; }
+        if (match && citation) {
+          flush(); const cited = citation(match[1]); i += match[0].length;
+          // Punctuation right after a citation stays on its line.
+          const tail = /^[,.;:!?)\]»”]+/.exec(text.slice(i));
+          if (tail) { const keep = node('span', undefined, 'citation-keep'); keep.append(cited, node('span', tail[0])); parent.append(keep); i += tail[0].length; }
+          else parent.append(cited);
+          continue;
+        }
       }
       if (text[i] === '`') {
         const marker = /^`+/.exec(text.slice(i))[0], end = text.indexOf(marker, i + marker.length);
