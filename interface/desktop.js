@@ -112,6 +112,7 @@
         // Keep the original node and all its action listeners for mobile and resize.
         item.button.removeAttribute('id');item.button.replaceWith(link);item.link = link;
       }
+      window.limitarNavegacaoConvidado?.();
       body = element('div');body.id = 'desktop-composicao';
       body.append(...form.childNodes);
       toolbar = element('div',undefined,'desktop-composer-toolbar');
@@ -305,7 +306,8 @@
     const area=active(),copy=titles[area];if(copy){['area-etiqueta','area-titulo','area-descricao'].forEach((id,i)=>text(id,copy[i]));}
     document.body.dataset.mesaArea=area;navigation();tab();
     const stages=[['cadastro','Documentos'],['codex','Pergunta'],['achados','Conferência'],['apuracao','Caderno']],stage={cadastro:0,documentos:0,codex:1,achados:2,apuracao:3,caderno:3}[area];
-    $('mesa-etapas').hidden=stage===undefined;
+    // Guests only ask questions; every other step is closed to them.
+    $('mesa-etapas').hidden=stage===undefined||document.body.dataset.papel==='convidado';
     if(stage!==undefined&&$('mesa-etapas').dataset.stage!==String(stage)){$('mesa-etapas').dataset.stage=String(stage);$('mesa-etapas').replaceChildren(...stages.map(([name,label],i)=>{const a=element('a');a.href=window.enderecoAreaMesa(name);a.dataset.mesaArea=name;a.append(element('span',String(i+1)),document.createTextNode(label));if(i===stage)a.setAttribute('aria-current','step');return a;}));}
     closeMenu();if(['inicio','documentos'].includes(area))loadInventory();
   }

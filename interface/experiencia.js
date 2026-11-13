@@ -7,6 +7,15 @@
     'caderno-texto','diligencias-texto','diligencias-estado-filtro','diligencias-responsavel-filtro'];
   let current = '', area = 'inicio', restoring = false, revision = 0;
   const desktop = matchMedia('(min-width: 1051px)');
+  // Guests work only in "Ask the AI"; the server enforces access, this keeps the screen honest.
+  const guest = document.body.dataset.papel === 'convidado';
+  window.limitarNavegacaoConvidado = () => {
+    if (!guest) return;
+    for (const item of document.querySelector('.areas').children) {
+      if (['A','BUTTON'].includes(item.tagName) && item.id !== 'ver-codex') item.hidden = true;
+    }
+  };
+  window.limitarNavegacaoConvidado();
   const pageOffsets = {documentos:0, achados:0, caderno:0};
   let restoredOffset = 0;
   window.restaurandoMesa = () => desktop.matches && restoring;
@@ -86,6 +95,7 @@
   const originalArea = showArea;
   showArea = name => {
     if (!$('area-' + name)) name = 'inicio';
+    if (guest) name = 'codex';
     area = name;
     originalArea(name);
     $('caderno-abas').hidden = !['apuracao','caderno'].includes(name);
@@ -166,19 +176,26 @@
     } catch (failure) { notice(failure.message); }
     finally { if(ticket===revision) {restoring=false;if (desktop.matches) writeRoute(true);} }
   }
+  // A guest invited to a single investigation lands with it selected; admins choose explicitly.
+  function selectOnlyCase(params) {
+    if (guest && !current && !params.get('caso') && cases.length === 1) window.definirContextoCaso(cases[0].id);
+  }
   let initialized = false;
   window.addEventListener('catalogo-carregado',()=>{
     $('contexto-caso').replaceChildren(new Option('Escolha uma apuração',''),...cases.map(c=>new Option(c.titulo,c.id)));
     adapt('contexto-caso',current);
+    const params = new URL(location.href).searchParams;
     if (!initialized) {
       initialized=true;
-      if (!new URL(location.href).searchParams.has('area')) {
+      if (!params.has('area') && !params.has('caso')) {
         let saved=''; try { saved=localStorage.getItem('mesa-apuracao') || ''; } catch {}
         if(cases.some(c=>c.id===saved)) window.definirContextoCaso(saved);
         showArea('inicio');
       } else restore();
-    } else if(current && !cases.some(c=>c.id===current)) {
-      window.definirContextoCaso('',{force:true});
+      selectOnlyCase(params);
+    } else {
+      if(current && !cases.some(c=>c.id===current)) window.definirContextoCaso('',{force:true});
+      selectOnlyCase(new URLSearchParams());
     }
   });
   window.addEventListener('popstate',restore);
