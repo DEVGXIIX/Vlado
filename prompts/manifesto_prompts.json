@@ -1,5 +1,5 @@
 {
-  "versao": "1.4.0",
+  "versao": "1.4.1",
   "modulos": [
     {
       "arquivo": "prompts/00_REGRAS.md",
@@ -7,7 +7,7 @@
     },
     {
       "arquivo": "prompts/01_DESCREVER_CORPUS.md",
-      "sha256": "f240a1dd7e073aec7ff8a95573077fdef5fb8570ee9b5efd250d5812f294784f"
+      "sha256": "f8ee481cd3c7b461bb200e0556e707d5e05ded532bc81da106e9fa18d4a2bc9a"
     },
     {
       "arquivo": "prompts/02_PLANEJAR.md",
@@ -32,6 +32,6 @@
   ],
   "fluxo_completo": {
     "arquivo": "prompts/FLUXO_COMPLETO.md",
-    "sha256": "a96607a283edfbfd33da89f297bd5e1ff8386ea8d50a7671f4d4deebefa998d4"
+    "sha256": "76ba7c9ace4059ea0c2c61abf889ffb74067a234d2019be138ca9460e076af12"
   }
 }

@@ -48,7 +48,9 @@ window.Leitura = (() => {
     const info = doc.extracao_pdf, messages = [];
     if (info?.paginas_sem_texto?.length) messages.push(`Sem texto extraível: páginas ${info.paginas_sem_texto.join(', ')}. Consulte essas páginas no original; a busca textual não as cobre.`);
     if (info?.paginas_com_erro?.length) messages.push(`Falha de extração nas páginas ${info.paginas_com_erro.map(p => p.pagina_pdf).join(', ')}. O original foi preservado.`);
-    if (info?.estado === 'erro' && !info.paginas_com_erro?.length) messages.push('Não foi possível extrair o texto deste PDF. Consulte o original.');
+    if (info?.paginas_ocr?.length) messages.push(`Páginas ${info.paginas_ocr.join(', ')} vieram de OCR automático e podem conter erros. Confira essas páginas no original.`);
+    if (info?.protegido) messages.push('PDF protegido por senha: o texto não foi extraído. Consulte o original.');
+    else if (info?.estado === 'erro' && !info.paginas_com_erro?.length) messages.push('Não foi possível extrair o texto deste PDF. Consulte o original.');
     if (!info && /\.pdf$/i.test(doc.nome_recebido || doc.nome_documento || doc.arquivo || doc.original || '')) messages.push('PDF sem extração textual registrada. Consulte o original.');
     return messages;
   }

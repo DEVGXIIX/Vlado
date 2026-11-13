@@ -26,6 +26,16 @@ def diagnostico():
         result['extracao_pdf'] = {'disponivel': True, 'versao': getattr(package, '__version__', None)}
     except Exception as exc:
         result['extracao_pdf']['erro'] = str(exc)
+    # OCR local e informativo: nao entra em `pronto` (PDFs nativos funcionam sem ele).
+    try:
+        import ocr
+        detalhe = ocr.diagnostico()
+        result['ocr'] = {'disponivel': detalhe['disponivel'], 'motor': detalhe.get('motor'),
+                         'motivo': detalhe.get('motivo'),
+                         'tesseract': detalhe['tesseract'].get('versao'),
+                         'ghostscript': bool(detalhe['ocrmypdf'].get('ghostscript'))}
+    except Exception as exc:
+        result['ocr'] = {'disponivel': False, 'motivo': str(exc)[:300]}
     result['exportacao_apuracao'] = {}
     for package, format in (('docx', 'docx'), ('reportlab', 'pdf')):
         try:

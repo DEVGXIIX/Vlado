@@ -276,11 +276,12 @@ $('proximo').addEventListener('click', () => { if (lastResult?.proximo_deslocame
 $('exportar').addEventListener('click', () => {
   if (lastResult) window.exportarEditorial(lastResult,`pesquisa_${lastResult.caso_id}_${lastResult.rodada}_${lastResult.geracao}`,$('pesquisa-formato').value);
 });
-let inventorySequence = 0, draftCaseId = '', pdfAvailable = false, cadastroBusy = false;
+let inventorySequence = 0, draftCaseId = '', pdfAvailable = false, ocrAvailable = false, cadastroBusy = false;
 async function loadPdfEnvironment() {
   try {
     const environment = await api('ambiente', {});
     pdfAvailable = Boolean(environment.extracao_pdf?.disponivel);
+    ocrAvailable = Boolean(environment.ocr?.disponivel);
     $('pdf-ambiente-aviso').textContent = pdfAvailable ? '' : 'O extrator de PDF está indisponível nesta instância. Encerre a Mesa e reabra pelo iniciador atualizado. Os arquivos enviados serão preservados, mas os PDFs ficarão sem texto preparado.';
     $('pdf-ambiente-aviso').hidden = pdfAvailable;
     $('pdf-ambiente-tecnico').replaceChildren(Leitura.tecnicos(element('pre', JSON.stringify(environment, null, 2), 'raw-briefing')));
@@ -306,26 +307,59 @@ function toggleNewCase() {
 function extractionMessage(info) {
   if (!info) return '';
   const labels = {extraido:'Texto extraído', parcial:'Extração parcial',
-    sem_texto:'Sem texto extraível; pode precisar de OCR', erro:'Falha na extração; original preservado'};
+    sem_texto: info.ocr_tentado ? 'Sem texto extraível, mesmo após OCR' : 'Sem texto extraível; pode precisar de OCR',
+    erro: info.protegido ? 'PDF protegido por senha; texto não extraído; original preservado' : 'Falha na extração; original preservado'};
   let message = labels[info.estado] || 'Extração não informada';
   if (info.paginas_pdf != null) message += ` · ${info.paginas_com_texto} de ${info.paginas_pdf} página(s) com texto`;
   if (info.paginas_sem_texto?.length) message += ` · Sem texto: página(s) ${info.paginas_sem_texto.join(', ')}`;
   if (info.paginas_com_erro?.length) message += ` · Com erro: página(s) ${info.paginas_com_erro.map(p => p.pagina_pdf).join(', ')}`;
   return message;
 }
+function extractionDetails(info) {
+  // One short line per fact so each line can be translated as a whole.
+  const lines = [], pages = list => list.join(', ');
+  if (!info || info.paginas_pdf == null) return lines;
+  const native = info.paginas_texto_nativo;
+  if (native?.length) lines.push(`Texto nativo: ${native.length} página(s)`);
+  if (info.paginas_ocr?.length) {
+    lines.push(`Reconhecidas por OCR: página(s) ${pages(info.paginas_ocr)}`);
+    const engine = info.ocr_motor;
+    if (engine) lines.push(`Motor de OCR: ${engine.motor} ${Object.entries(engine.versoes || {}).filter(([, v]) => v).map(([k, v]) => `${k} ${v}`).join(', ')} · idiomas ${engine.idiomas}`);
+    lines.push('O texto de OCR é reconhecimento automático e pode conter erros; confira o original.');
+  }
+  const ocrFailures = (info.paginas_com_erro || []).filter(p => p.etapa === 'ocr').map(p => p.pagina_pdf);
+  if (ocrFailures.length) lines.push(`Falha no OCR: página(s) ${pages(ocrFailures)}`);
+  if (info.ocr_indisponivel && info.paginas_sem_texto?.length) lines.push(`OCR não executado: ${info.ocr_indisponivel}`);
+  return lines;
+}
+function appendExtraction(row, info, limited) {
+  if (!info) return;
+  row.append(element('p', extractionMessage(info), limited ? 'limitation' : 'small'));
+  for (const line of extractionDetails(info)) row.append(element('p', line, 'small'));
+}
+function ocrNeeded(doc) {
+  const info = doc.extracao_pdf;
+  return Boolean(ocrAvailable && info && info.estado !== 'erro'
+    && ((info.paginas_sem_texto?.length && !info.ocr_tentado) || (info.paginas_com_erro || []).some(p => p.etapa === 'ocr')));
+}
+function pageSummary(result) {
+  const s = result.extracao_pdf_resumo;
+  if (!s || s.paginas_ocr === undefined) return null;
+  return `Páginas: ${s.paginas_texto_nativo} com texto nativo · ${s.paginas_ocr} por OCR · ${s.paginas_sem_texto} sem texto · ${s.paginas_com_erro} com falha`;
+}
 function showInventory(data) {
   const list = element('ul', undefined, 'document-list');
   for (const doc of data.documentos) {
     const row = element('li');
     row.append(element('strong', Leitura.nome(doc)));
-    if (doc.extracao_pdf) row.append(element('p', extractionMessage(doc.extracao_pdf), Leitura.lacunas(doc).length ? 'limitation' : 'small'));
+    appendExtraction(row, doc.extracao_pdf, Leitura.lacunas(doc).length);
     row.append(Leitura.tecnicos(element('pre', JSON.stringify(doc, null, 2), 'raw-briefing')));
     list.append(row);
   }
   $('cadastro-inventario').replaceChildren(element('h3', `${Leitura.quantidade(data.total_documentos, 'documento')} nesta apuração`), list,
     Leitura.tecnicos(`Apuração: ${data.caso_id} · Corpus: ${data.corpus_id}`));
   $('cadastro-inventario').hidden = false;
-  const pending = data.documentos.filter(doc => /\.pdf$/i.test(doc.nome_recebido || doc.arquivo || '') && (!doc.extracao_pdf || doc.extracao_pdf.estado === 'erro'));
+  const pending = data.documentos.filter(doc => /\.pdf$/i.test(doc.nome_recebido || doc.arquivo || '') && (!doc.extracao_pdf || doc.extracao_pdf.estado === 'erro' || ocrNeeded(doc)));
   $('cadastro-preparacao').hidden = !pending.length;
   $('cadastro-preparacao-resumo').textContent = `${Leitura.quantidade(pending.length, 'PDF pendente de preparação', 'PDFs pendentes de preparação')}. Você pode tentar extrair o texto sem enviar os arquivos novamente.`;
   $('cadastro-preparar').disabled = !pdfAvailable || cadastroBusy;
@@ -334,12 +368,13 @@ function renderReceipt(result, preparation = false) {
   const list = element('ul', undefined, 'document-list');
   for (const item of result.arquivos) {
     const row = element('li', `${Leitura.nome(item)} · ${preparation ? 'original já cadastrado' : item.estado === 'duplicado' ? 'duplicata identificada' : 'cadastrado'}`);
-    if (item.extracao_pdf) row.append(element('p', extractionMessage(item.extracao_pdf), Leitura.lacunas(item).length ? 'limitation' : 'small'));
+    appendExtraction(row, item.extracao_pdf, Leitura.lacunas(item).length);
     row.append(Leitura.tecnicos(element('pre', JSON.stringify(item, null, 2), 'raw-briefing')));
     list.append(row);
   }
   $('cadastro-recibo').replaceChildren(element('h3', preparation ? `Preparação conferida: ${Leitura.quantidade(result.recebidos, 'PDF')}` : `Envio conferido: ${result.recebidos} de ${result.arquivos.length} arquivo(s)`),
     element('p', preparation ? 'Novos derivados registrados, sem alterar os originais.' : `${result.novos} novo(s) · ${result.duplicados} duplicado(s) · ${result.total_documentos} documento(s) no caso.`),
+    ...(pageSummary(result) ? [element('p', pageSummary(result), 'small')] : []),
     list, Leitura.tecnicos(`Apuração: ${result.caso_id} · Corpus: ${result.corpus_id} · Recibo: ${result.arquivo_recibo}`));
   $('cadastro-recibo').hidden = false;
 }

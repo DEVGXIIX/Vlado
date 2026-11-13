@@ -182,7 +182,7 @@ O acervo público proposto reúne três fatos relevantes da Americanas S.A., de 
 
 ## 9. Fora do escopo do piloto
 
-- OCR, leitura de imagens como fonte principal e documentos fora de PDF.
+- Leitura de imagens avulsas como fonte principal e documentos fora de PDF (o OCR das páginas digitalizadas de PDF é automático, mas não é conferência editorial).
 - Ingestão pelos convidados; múltiplos acervos simultâneos por convidado.
 - Busca na web, conectores externos ou cruzamento entre casos.
 - Aprovação editorial automática, checagem factual externa ou publicação jornalística.

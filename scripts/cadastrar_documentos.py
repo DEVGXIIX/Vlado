@@ -17,6 +17,7 @@ import uuid
 
 from comum import ROOT, arquivos_do_corpus, dentro, escrever_json, ler_json, sha256, pasta_preparacao
 from criar_caso import EXTENSOES
+import ocr
 from extrair_pdf import extrair_pdf
 from lixeira import conferir_disponivel
 
@@ -104,6 +105,26 @@ def preparar_pdfs(root, caso):
                           operacao='preparacao_pdfs_cadastrados')
 
 
+def _precisa_reprocessar_ocr(info):
+    """A prepared PDF still lacks OCR it could now receive (never attempted, or pages that failed)."""
+    if not info or info.get('estado') == 'erro' or not ocr.diagnostico()['disponivel']:
+        return False
+    falhou = any(p.get('etapa') == 'ocr' for p in info.get('paginas_com_erro', []))
+    return falhou or (bool(info.get('paginas_sem_texto')) and not info.get('ocr_tentado'))
+
+
+def _resumo_pdfs(pdfs, processed):
+    infos = [d['extracao_pdf'] for d in pdfs.values()]
+    return {'pdfs': len(pdfs), 'processados_agora': processed,
+            **{state: sum(i['estado'] == state for i in infos) for state in ('extraido', 'parcial', 'sem_texto', 'erro')},
+            'paginas_texto_nativo': sum(len(i['paginas_texto_nativo']) if 'paginas_texto_nativo' in i
+                                        else i.get('paginas_com_texto', 0) for i in infos),
+            'paginas_ocr': sum(len(i.get('paginas_ocr', [])) for i in infos),
+            'paginas_sem_texto': sum(len(i.get('paginas_sem_texto', [])) for i in infos),
+            'paginas_com_erro': sum(len(i.get('paginas_com_erro', [])) for i in infos),
+            'protegidos': sum(bool(i.get('protegido')) for i in infos)}
+
+
 def _cadastrar(root, caso, sources, title, nature, new, *, operacao='recepcao_documentos'):
     conferir_disponivel(root, caso)
     destination = dentro(root, f'casos/{caso}')
@@ -182,7 +203,8 @@ def _cadastrar(root, caso, sources, title, nature, new, *, operacao='recepcao_do
             # A repeated successful/empty/partial extraction is not silently replaced.
             # Re-sending an errored PDF explicitly permits another attempt in a new batch.
             existing = doc.get('extracao_pdf')
-            if existing and existing['estado'] != 'erro':
+            reprocess = operacao == 'preparacao_pdfs_cadastrados' and _precisa_reprocessar_ocr(existing)
+            if existing and existing['estado'] != 'erro' and not reprocess:
                 continue
             source = (work / 'originais' / Path(doc['arquivo']).name if identifier in copied
                       else dentro(root, doc['arquivo']))
@@ -190,10 +212,16 @@ def _cadastrar(root, caso, sources, title, nature, new, *, operacao='recepcao_do
             doc['extracao_pdf'] = extrair_pdf(source, identifier, target)
             doc['paginas_pdf'] = doc['extracao_pdf']['paginas_pdf']
             if target.is_file():
-                doc.setdefault('derivados', []).append({
-                    'arquivo': f'{prefix}/derivados/{target.name}', 'sha256': sha256(target),
-                    'tipo': 'texto_extraido_pdf', 'origem_sha256': doc['sha256'],
-                    'metodo': doc['extracao_pdf']['metodo']})
+                # A new version replaces the prior working copy of this PDF; old rounds keep theirs.
+                old = [d for d in doc.get('derivados', []) if d.get('tipo') == 'texto_extraido_pdf']
+                doc['derivados'] = [d for d in doc.get('derivados', []) if d.get('tipo') != 'texto_extraido_pdf']
+                entry_pdf = {'arquivo': f'{prefix}/derivados/{target.name}', 'sha256': sha256(target),
+                             'tipo': 'texto_extraido_pdf', 'origem_sha256': doc['sha256'],
+                             'metodo': doc['extracao_pdf']['metodo'],
+                             'paginas_origem': doc['extracao_pdf']['paginas_origem']}
+                if old:
+                    entry_pdf['substitui_sha256'] = old[-1]['sha256']
+                doc['derivados'].append(entry_pdf)
             processed += 1
         changed = manifest['documentos'] != previous['documentos']
         if changed:
@@ -209,9 +237,7 @@ def _cadastrar(root, caso, sources, title, nature, new, *, operacao='recepcao_do
             if doc['id'] in pdfs:
                 item['extracao_pdf'] = deepcopy(doc['extracao_pdf'])
                 item['derivados'] = deepcopy(doc['derivados'])
-        summary = {'pdfs': len(pdfs), 'processados_agora': processed,
-                   **{state: sum(d['extracao_pdf']['estado'] == state for d in pdfs.values())
-                      for state in ('extraido', 'parcial', 'sem_texto', 'erro')}}
+        summary = _resumo_pdfs(pdfs, processed)
         receipt = {'lote_id': batch, 'caso_id': caso, 'corpus_id': manifest['corpus_id'],
                    'operacao': operacao, 'recebido_em_utc': datetime.now(timezone.utc).isoformat(),
                    'recebidos': len(receipts), 'novos': len(incoming),

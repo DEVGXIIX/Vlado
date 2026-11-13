@@ -118,7 +118,7 @@ Uma queda do servidor preserva os eventos e marca a execução como interrompida
 
 - Retomada após queda do servidor no meio de uma etapa: não verificada nesta migração.
 - Custos, limites de cobrança, chave inválida ou expirada e erros reais do provedor: não verificados em execução real.
-- Sem OCR. A leitura visual de PDF depende de dependência opcional.
+- O OCR é local (cadastro), não passa pela API; a leitura visual de PDF depende de dependência opcional.
 - DOCX e XLSX continuam sem adaptador próprio neste fluxo.
 - Os resultados registrados em 06/11/2026 para a integração anterior, com `codex app-server`, não se aplicam ao código atual.
 - Não há tela de aprovação de permissões nem ampliação de acesso pela interface.

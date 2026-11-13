@@ -1,8 +1,20 @@
 # VLADO — hosted pilot image (modo piloto, behind an HTTPS reverse proxy).
-FROM python:3.12-slim
+# Base pinned to Debian 12 (bookworm) so the apt packages below resolve to the versions noted.
+FROM python:3.12-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
+
+# Local OCR for scanned PDFs (OCRmyPDF engine + direct Tesseract fallback). Nothing leaves the container.
+# Expected bookworm versions (not pinned in apt, so security updates keep applying; UNVERIFIED here,
+# the image could not be built where this was written): tesseract-ocr 5.3.0 (+ -por, -eng, -osd
+# 1:4.1.0), ghostscript 10.0.0, pngquant 2.17.0, unpaper 6.1. OCRmyPDF itself is pinned in requirements.txt.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       tesseract-ocr tesseract-ocr-por tesseract-ocr-eng tesseract-ocr-osd \
+       ghostscript pngquant unpaper \
+    && rm -rf /var/lib/apt/lists/*
+ENV VLADO_OCR_IDIOMAS=por+eng
 
 WORKDIR /app
 RUN useradd --create-home --uid 10001 vlado
