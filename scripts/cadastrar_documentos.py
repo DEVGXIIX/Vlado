@@ -12,6 +12,7 @@ import re
 import shutil
 import sys
 import tempfile
+import time
 import uuid
 
 from comum import ROOT, arquivos_do_corpus, dentro, escrever_json, ler_json, sha256, pasta_preparacao
@@ -41,7 +42,16 @@ def _atomico(path, content):
         temp = Path(stream.name)
         stream.write(content)
     try:
-        os.replace(temp, path)
+        # Windows refuses os.replace while another writer or an antivirus scan holds the
+        # destination for a moment; retry briefly instead of failing the whole operation.
+        for tentativa in range(40):
+            try:
+                os.replace(temp, path)
+                break
+            except PermissionError:
+                if tentativa == 39:
+                    raise
+                time.sleep(0.025)
     finally:
         temp.unlink(missing_ok=True)
 

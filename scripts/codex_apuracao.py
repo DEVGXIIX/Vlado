@@ -121,7 +121,8 @@ class Conversas:
             return ctx
 
     def _save(self, identifier):
-        _atomico(self._path(identifier) / 'conversa.json', _bytes(self.contexts[identifier]['meta']))
+        with self.lock:  # stage thread and provider notifications both save the conversation
+            _atomico(self._path(identifier) / 'conversa.json', _bytes(self.contexts[identifier]['meta']))
 
     def _event(self, identifier, kind, data):
         with self.condition:

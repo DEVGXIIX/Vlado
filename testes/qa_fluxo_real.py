@@ -21,6 +21,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--saida-base', required=True)
     parser.add_argument('--complemento', action='store_true')
+    parser.add_argument('--limite-tokens', type=int, default=None,
+                        help='Teto de tokens (entrada+saída) desta consulta; a rodada para ao ultrapassar.')
     args = parser.parse_args()
     base = Path(args.saida_base).resolve()
     if not base.is_relative_to(ROOT.resolve()):
@@ -36,7 +38,9 @@ def main():
     origem = ler_json(ROOT / 'configuracao.json')
     escrever_json(root / 'configuracao.json', {'caso_ativo': None, 'manifesto_ativo': None,
         'maximo_documentos_inicial': 20, 'indice_sqlite': True, 'web_na_apuracao': False,
-        **{k: origem.get(k) for k in ('provedor', 'modelo_preferido', 'max_tokens_saida', 'limites') if k in origem}})
+        **{k: origem.get(k) for k in ('provedor', 'modelo_preferido', 'max_tokens_saida', 'limites') if k in origem},
+        **({'limites': {'tokens_por_consulta': args.limite_tokens, 'tokens_por_dia': args.limite_tokens * 2}}
+           if args.limite_tokens else {})})
     # Use the provider chosen and the key pasted in the Mesa (the environment variable still wins).
     if (ROOT / 'ajustes/inferencia.json').is_file():
         (root / 'ajustes').mkdir()
