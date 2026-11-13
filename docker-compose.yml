@@ -1,0 +1,51 @@
+# VLADO hosted pilot: app (modo piloto) + Caddy (automatic HTTPS).
+# Usage: copy .env.example to .env, set VLADO_DOMINIO, then `docker compose up -d --build`.
+# Guide: docs/IMPLANTACAO_PILOTO.md
+services:
+  vlado:
+    build: .
+    image: vlado:${VLADO_VERSAO:-local}
+    restart: unless-stopped
+    environment:
+      VLADO_DOMINIO: ${VLADO_DOMINIO:?defina VLADO_DOMINIO no arquivo .env}
+      # Optional: a key in the environment takes precedence over the key pasted in the Mesa.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - casos:/app/casos
+      - conversas:/app/conversas
+      - execucoes:/app/execucoes
+      - lixeira:/app/lixeira
+      - entrada:/app/entrada
+      - segredos:/app/segredos
+      - ajustes:/app/ajustes
+      - acesso:/app/acesso
+    expose:
+      - "8765"
+
+  caddy:
+    image: caddy:2.8
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      VLADO_DOMINIO: ${VLADO_DOMINIO:?defina VLADO_DOMINIO no arquivo .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - vlado
+
+volumes:
+  casos:
+  conversas:
+  execucoes:
+  lixeira:
+  entrada:
+  segredos:
+  ajustes:
+  acesso:
+  caddy_data:
+  caddy_config:
