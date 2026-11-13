@@ -10,7 +10,6 @@ import sys
 import venv
 
 from ambiente import diagnostico
-from codex_rpc import ErroCodex, localizar_codex
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -25,11 +24,9 @@ def main():
     if args.verificar:
         result = diagnostico()
         result['leitura_visual_pdf'] = importlib.util.find_spec('fitz') is not None
-        try:
-            result['codex_executavel_localizado'] = bool(localizar_codex())
-        except ErroCodex as exc:
-            result['codex_executavel_localizado'] = False
-            result['orientacao_codex'] = str(exc)
+        if not any(result['inferencia_api']['chaves'].values()):
+            result['orientacao_api'] = ('Defina ANTHROPIC_API_KEY ou OPENAI_API_KEY no ambiente do servidor '
+                                        'antes de abrir a Mesa; a chave nunca vai para o projeto.')
         print(json.dumps(result, ensure_ascii=True, indent=2))
         return 0 if result['pronto'] else 1
     target = ROOT / '.venv'
@@ -49,8 +46,8 @@ def main():
     subprocess.run([str(python), str(ROOT / 'scripts/ambiente.py')], cwd=ROOT, check=True)
     subprocess.run([str(python), str(ROOT / 'scripts/montar_fluxo.py'), '--check'], cwd=ROOT, check=True)
     subprocess.run([str(python), str(ROOT / 'scripts/verificar_projeto.py')], cwd=ROOT, check=True)
-    print('Dependências preparadas. Abra Abrir mesa.vbs e verifique a conexão com o Codex.')
-    print('O Codex e o login da conta são configurados separadamente no notebook.')
+    print('Dependências preparadas. Defina a chave da API no ambiente e abra Abrir mesa.vbs.')
+    print('Provedor e modelo ficam em configuracao.json; a chave fica só na variável de ambiente.')
     return 0
 
 

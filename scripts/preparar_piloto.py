@@ -19,7 +19,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = ROOT / 'empacotamento/piloto_1_0'
 GUIDES = ('APURACAO', 'ACHADOS_IA', 'BANCO_SQLITE', 'CADASTRO_DOCUMENTOS', 'CADERNO_APURACAO',
-          'CONTINUIDADE_DOCUMENTAL', 'DILIGENCIAS', 'FLUXO_AUTOMATICO_CODEX', 'INTEGRACAO_CODEX',
+          'CONTINUIDADE_DOCUMENTAL', 'DILIGENCIAS', 'FLUXO_AUTOMATICO_CODEX', 'INTEGRACAO_API',
           'INTERFACE_PESQUISA', 'PILOTO')
 
 
@@ -84,7 +84,7 @@ def assemble(output):
     html = (output / 'interface/index.html').read_text(encoding='utf-8')
     html = html.replace('<title>Mesa de apuração</title>', '<title>Mesa de apuração — 1.0 piloto</title>')
     write(output, 'interface/index.html', html)
-    for name in ('INTEGRACAO_CODEX', 'INTERFACE_PESQUISA'):
+    for name in ('INTEGRACAO_API', 'INTERFACE_PESQUISA'):
         path = output / f'docs/{name}.md'
         write(output, f'docs/{name}.md', '> Guia técnico da base 1.3.0. A distribuição 1.0 piloto começa vazia; verificações históricas descritas abaixo não equivalem a testes no notebook. Consulte INSTALAR_NO_NOTEBOOK.md e DESKTOP_PILOTO.md.\n\n' + path.read_text(encoding='utf-8'))
     readme = output / 'scripts/README.md'

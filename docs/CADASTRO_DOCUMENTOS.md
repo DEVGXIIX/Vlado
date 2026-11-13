@@ -1,13 +1,13 @@
 # Cadastro antes da pergunta
 
-Implementado em 04/11/2026, versão operacional e prompts **1.2.0**, a pedido do usuário. Cada lote deve ser cadastrado assim que for enviado, antes de qualquer pergunta editorial. O objetivo é contabilizar todos os arquivos recebidos, preservar cópias e evitar que a seleção orientada pela pergunta deixe anexos de fora.
+Implementado em 04/11/2026, versão operacional e prompts **1.2.0**, a pedido do usuário. Atualizado em 13/11/2026 para versão operacional e prompts **1.4.0**; o cadastro não faz chamadas de modelo. Cada lote deve ser cadastrado assim que for enviado, antes de qualquer pergunta editorial. O objetivo é contabilizar todos os arquivos recebidos, preservar cópias e evitar que a seleção orientada pela pergunta deixe anexos de fora.
 
 ## Na interface
 
 1. Abra `Iniciar pesquisa.cmd`. Em **Cadastrar documentos**, escolha novo caso ou o caso que receberá outro lote.
 2. Para um caso novo, informe apenas o nome; o ID é gerado internamente. Indique documentos públicos ou materiais sintéticos e selecione todos os arquivos do envio.
 3. Clique em **Enviar e cadastrar agora**. O envio produz imediatamente um recibo por arquivo: nome, ID, hash e condição de novo documento ou duplicata. O inventário mostra o total acumulado do caso, mesmo sem rodada ou pergunta.
-4. Confira o número de arquivos do recibo e acrescente outros lotes, se necessário. Só depois envie sua pergunta no Codex, indicando o caso. A seleção no navegador não muda o caso ativo do Codex.
+4. Confira o número de arquivos do recibo e acrescente outros lotes, se necessário. Só depois envie sua pergunta na conversa da Mesa (ou ao agente de chat), indicando o caso. A seleção no navegador não muda o caso ativo do Codex.
 
 O envio admite até 50 MB e 100 arquivos por lote. O limite de documentos únicos por caso vem da configuração (inicialmente 20). Formatos aceitos: PDF, PNG, JPG/JPEG, TXT, MD, CSV/TSV, XLSX e DOCX. PDFs passam por extração textual automática com `pypdf`, sem OCR. O recibo e o inventário informam o resultado e as páginas sem texto ou com erro. Imagens avulsas e outros formatos continuam sem conversão automática.
 
@@ -54,4 +54,4 @@ O comando lê somente as cópias preservadas do caso indicado. Registra uma oper
 
 Pendências de anexos conhecidos pelo chat precisam ser resolvidas ou explicitamente excluídas pelo usuário antes de criar a rodada. O script só pode conferir arquivos e recibos que lhe foram informados; não consegue descobrir anexos omitidos pelo operador. O recibo deve ser confrontado com o envio original, não apenas com os arquivos que puderam ser abertos.
 
-O restante do fluxo continua após a pergunta: snapshot, índice da rodada, cobertura, planejamento, pesquisa, cruzamento, revisão e briefing. O cadastro prepara o texto dos PDFs, mas não executa inferência, OCR ou análise editorial. A inferência continua online no Codex e o cadastro não constitui piloto editorial.
+O restante do fluxo continua após a pergunta: snapshot, índice da rodada, cobertura, planejamento, pesquisa, cruzamento, revisão e briefing. O cadastro prepara o texto dos PDFs, mas não executa inferência, OCR ou análise editorial. A inferência ocorre online, pela API do provedor configurado, somente depois da pergunta. O cadastro não constitui piloto editorial.

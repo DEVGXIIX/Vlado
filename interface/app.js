@@ -107,7 +107,7 @@ $('rodada').addEventListener('change', () => {
   options('geracao', (current?.geracoes || []).map(g => ({value:g, label:`Versão ${g.replace(/^g/,'')} (${g})`})), 'Selecione a versão');
   $('busca-tecnica').open = Boolean(current);
   empty(current && !current.geracoes.length ? 'Rodada sem índice disponível' : 'Escolha a versão do índice',
-    current && !current.geracoes.length ? 'Esta rodada precisa de construção explícita do índice pelo Codex. A tela não reconstrói nem sobrescreve índices.' : 'A cobertura será conferida antes da pesquisa.');
+    current && !current.geracoes.length ? 'Esta rodada precisa de construção explícita do índice. A tela não reconstrói nem sobrescreve índices.' : 'A cobertura será conferida antes da pesquisa.');
 });
 function updateScopeHeading() {
   const current = cases.find(c => c.id === $('caso').value);
@@ -165,7 +165,7 @@ $('geracao').addEventListener('change', async () => {
     $('status').textContent = 'Acervo conferido e pronto para consulta.';
     empty(ready ? 'Acervo pronto para pesquisar' : 'Não há texto pesquisável neste índice', ready
       ? 'Digite um termo ou uma expressão. Abra os filtros para restringir por documento ou página.'
-      : 'Consulte a cobertura. PDFs e imagens precisam de cópias textuais autorizadas ou leitura direta no Codex.');
+      : 'Consulte a cobertura. PDFs e imagens precisam de cópias textuais autorizadas ou leitura direta pela IA.');
   } catch (failure) {
     if (version === epoch) { $('status').textContent = 'Índice indisponível.'; error(failure.message); empty('Não foi possível consultar este índice', 'Confira o erro antes de continuar. Uma falha no índice não equivale a uma pesquisa sem resultados.'); }
   }
@@ -356,7 +356,7 @@ $('cadastro-preparar').addEventListener('click', async () => {
     const pdf = result.extracao_pdf_resumo;
     $('cadastro-status').textContent = pdf.erro || pdf.parcial || pdf.sem_texto
       ? 'Preparação concluída com limitações. Confira as páginas sem texto e os erros no recibo.'
-      : 'PDFs preparados. Aguardando sua pergunta no Codex.';
+      : 'PDFs preparados. Aguardando sua pergunta.';
   } catch (failure) {
     uploadError(failure.message);
     $('cadastro-status').textContent = 'A preparação não foi confirmada. Os originais continuam preservados.';
@@ -431,8 +431,8 @@ $('cadastro').addEventListener('submit', async event => {
     $('arquivos-selecionados').textContent = 'Pronto para selecionar outro lote.';
     const pdf = result.extracao_pdf_resumo;
     $('cadastro-status').textContent = pdf && (pdf.erro || pdf.parcial || pdf.sem_texto)
-      ? 'Originais registrados. Confira as limitações de extração no recibo antes da pergunta no Codex.'
-      : 'Corpus registrado. Aguardando sua pergunta no Codex.';
+      ? 'Originais registrados. Confira as limitações de extração no recibo antes da pergunta.'
+      : 'Corpus registrado. Aguardando sua pergunta.';
   } catch (failure) {
     uploadError(failure.message);
     $('cadastro-status').textContent = 'Envio sem confirmação nesta tela. Consulte o inventário antes de continuar; um reenvio identifica arquivos duplicados.';
@@ -488,7 +488,7 @@ function showArea(area) {
     inicio:['SUA MESA DE TRABALHO','Comece uma apuração. Ou retome de onde parou.','Documentos, perguntas e fontes no mesmo contexto.'],
     codex:['APURAR COM O ACERVO','Pergunte. Acompanhe. Confira as fontes.','Converse com os documentos desta apuração. A análise da IA acontece online.'],
     cadastro:['PREPARAR O ACERVO','Primeiro, os documentos. Depois, a pergunta.','Cadastre cada envio, confira o recibo e abra Perguntar à IA para iniciar a conversa.'],
-    documentos:['CONSULTAR O ACERVO','Encontre a informação. Confira a fonte.','Pesquise nos documentos de uma rodada preparada no Codex.'],
+    documentos:['CONSULTAR O ACERVO','Encontre a informação. Confira a fonte.','Pesquise nos documentos de uma rodada preparada.'],
     gerenciar:['ORGANIZAR A MESA','Abra espaço para a próxima pergunta.','Gerencie apurações, conversas e rodadas. Tudo o que for excluído pode ser restaurado na lixeira.'],
     caderno:['CONTRIBUIÇÕES HUMANAS','O que você encontrou nos documentos?','Guarde passagens, registre achados e construa cruzamentos com autoria humana identificada.'],
     apuracao:['APURAÇÃO','Seu caderno de trabalho','Escreva notas, reúna evidências e exporte o caderno com referências.'],
@@ -512,7 +512,6 @@ function showArea(area) {
     fetch('/api/integracao').then(response => {
       if (!response.ok) {
         $('codex-conta').textContent = 'O servidor aberto está desatualizado. Encerre as instâncias anteriores e inicie a Mesa novamente.';
-        $('codex-login').disabled = true;
       }
     }).catch(() => { $('codex-conta').textContent = 'Servidor desconectado. Inicie a Mesa novamente.'; });
   }
@@ -549,7 +548,7 @@ $('achados-revisao').addEventListener('change', () => {
   const generations = (findingCatalog?.indices || []).filter(g => g.revisao === revision);
   options('achados-geracao', generations.map(g => ({value:g.geracao, label:`Versão ${g.geracao.replace(/^g/,'')} (${g.geracao})`})), 'Selecione a geração');
   $('achados-status').textContent = !revision ? 'Selecione a revisão.' : generations.length
-    ? 'Escolha a versão dos resultados desta etapa.' : 'Índice derivado ausente para esta revisão. Os registros canônicos permanecem preservados; construir pelo Codex.';
+    ? 'Escolha a versão dos resultados desta etapa.' : 'Índice derivado ausente para esta revisão. Os registros canônicos permanecem preservados; construir o índice antes de consultar.';
 });
 const findingScope = () => ({caso:$('caso').value, rodada:$('rodada').value,
   revisao:$('achados-revisao').value, geracao_achados:$('achados-geracao').value});

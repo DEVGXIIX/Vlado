@@ -38,3 +38,6 @@ tmp/
 /docs/VLADO_HANDOFF.md
 /docs/VLADO_GUIA_TECNICO_DEPLOY.md
 /manifesto_distribuicao.json
+
+# Estado local de ferramentas de agente (Ruflo/claude-flow)
+/.claude-flow/

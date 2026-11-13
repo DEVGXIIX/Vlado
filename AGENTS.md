@@ -1,6 +1,6 @@
 # Apuração v1 online - orientações do projeto
 
-Este é um projeto independente de assistência à apuração documental, operado no próprio chat do Codex. As instruções desta pasta especializam a operação desta versão; os arquivos da pesquisa acadêmica e do repositório de referência não são entradas de apuração.
+Este é um projeto independente de assistência à apuração documental. Há dois modos de operação: (1) um agente de chat (Codex, Claude Code ou similar) opera o projeto pelos scripts e arquivos; (2) a Mesa de apuração, cuja inferência usa a API do provedor configurado em `configuracao.json`. As instruções desta pasta especializam a operação desta versão; os arquivos da pesquisa acadêmica e do repositório de referência não são entradas de apuração.
 
 ## Identificar a tarefa
 
@@ -18,8 +18,9 @@ Este é um projeto independente de assistência à apuração documental, operad
 
 - O cadastro extrai por padrão o texto dos PDFs, sem OCR, e autoriza os derivados paginados com hashes no manifesto. Conferir no recibo as páginas com texto, sem texto e com erro. Extração não equivale a leitura editorial ou validação. Original recebido com falha de extração permanece preservado e exige indicação da limitação. Para preparar PDFs já cadastrados, usar `scripts/cadastrar_documentos.py --caso ID --preparar-pdfs`; versionar o corpus sem modificar rodadas antigas. Não incluir imagens de diagnóstico da interface como documentos da apuração.
 
-- A inferência usa o modelo disponível na sessão do Codex, com processamento online. Não afirmar execução local, sigilo local, desempenho superior ou reprodução do artigo original.
-- Não instalar nem iniciar LM Studio, Ollama, Flask, ChromaDB ou os programas em `referencia_original` para operar esta versão. Os scripts ativos preparam, indexam e registram arquivos; não chamam uma API de modelos.
+- Na operação pelo agente de chat, a inferência usa o modelo disponível na sessão desse agente, com processamento online. Na Mesa, a inferência usa a API do provedor configurado (`provedor` e `modelo_preferido` em `configuracao.json`), com processamento online e cobrança por uso. Não afirmar execução local, sigilo local, desempenho superior ou reprodução do artigo original.
+- Chaves de API (`ANTHROPIC_API_KEY` ou `OPENAI_API_KEY`) ficam somente nas variáveis de ambiente do processo do servidor. Nunca as gravar em configuração, navegador, eventos, logs, histórico ou git.
+- Não instalar nem iniciar LM Studio, Ollama, Flask, ChromaDB ou os programas em `referencia_original` para operar esta versão. Cadastro, índice e registros não fazem chamadas de modelo. Somente `scripts/inferencia_api.py` e os módulos `scripts/provedor_*.py` chamam a API, e só quando uma pergunta ou complemento é enviado pela Mesa.
 - SQLite/FTS5 é um índice derivado das entradas congeladas de cada caso/rodada. Usar `scripts/banco.py` com IDs explícitos; consultar cobertura, preservar logs e ler o contexto/original antes de usar uma passagem como evidência. Não consultar outros bancos nem sobrescrever gerações. O índice não executa OCR, extração automática de campos ou checagem factual. O guia `docs/BANCO_SQLITE.md` documenta comandos e limitações.
 - Não fixar ou inventar o modelo usado. Registrar o nome exibido/informado e ferramentas realmente utilizadas; deixar desconhecido o que não puder observar.
 - Na apuração fechada, não navegar, usar conectores externos, consultar arquivos fora da pasta do projeto, ler `referencia_original`, ler outras rodadas nem procurar referências do avaliador. As URLs do manifesto registram procedência, sem autorizar sua abertura.

@@ -32,7 +32,7 @@ const [origin, output, chrome] = process.argv.slice(2);
     assert.doesNotMatch(await page.locator('#cadastro-recibo').innerText(), /apuracao_|SHA-256/);
     checks.push('Cadastro apenas por nome, ID interno automático, recibo sem identificadores expostos.');
     await page.click('#ver-codex');
-    await page.locator('#codex-conta').filter({hasText:'Conectado ao ChatGPT'}).waitFor();
+    await page.locator('#codex-conta').filter({hasText:'Conectado à API'}).waitFor();
     assert.equal(await page.locator('#codex-conexao').evaluate(el => el.open), false);
     assert.equal(await page.locator('#codex-caso option[value="fontes"]').innerText(), 'Americanas — fatos relevantes');
     await conversation();

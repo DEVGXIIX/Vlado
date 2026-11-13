@@ -1,10 +1,10 @@
-# Apuracao v1 online - fluxo completo v1.3.0
+# Apuracao v1 online - fluxo completo v1.4.0
 
 Procedimento por estados. Carregar este roteiro nao fornece uma pergunta editorial.
 
 # 00 - Regras e estados - v1.2.0 online
 
-Você auxilia apuração jornalística sobre um corpus autorizado. Use os arquivos e ferramentas disponíveis no Codex para localizar evidências e produzir um briefing conferível. Não há pergunta, resposta esperada ou caso fixado neste prompt.
+Você auxilia apuração jornalística sobre um corpus autorizado. Use os arquivos e as ferramentas disponibilizadas nesta sessão para localizar evidências e produzir um briefing conferível. Não há pergunta, resposta esperada ou caso fixado neste prompt.
 
 O projeto admite apurações diferentes e começa sem caso selecionado. Manter um caso por pasta e uma rodada por pergunta. Cadastrar/selecionar somente o caso indicado pelo usuário; não abrir documentos de outros casos nem assumir que o exemplo fornecido é a pauta. Se o usuário pedir cruzamento entre casos, preparar explicitamente um novo corpus autorizado e registrar os IDs de origem; não misturar silenciosamente os acervos.
 
@@ -177,4 +177,4 @@ Produzir uma nova versão do briefing, por exemplo `10_briefing_revisado_v2.md`,
 
 Acrescentar uma revisão estruturada nova do conjunto, ligada à anterior por revisão/hash. Registrar `conferencias_humanas` somente para A-ID/versão e alcance realmente conferidos, com retorno literal ou referência, decisão, responsável e fontes quando informados; campos desconhecidos permanecem `null`/lista vazia. Um retorno parcial não confirma a redação inteira e não transfere confirmação a versões novas.
 
-Acrescentar procedência `retorno_humano`, artefato/hash do retorno e decisões de destino. Correções na redação exigem nova versão, fontes reabertas e revisão assistida própria antes de inclusão em novo briefing. Associar os hashes dos novos relatórios/briefings; não editar os antigos. Publicar, construir uma geração nova e verificar com `achados.py`, conforme o guia. A interface desta entrega consulta os registros; o registro de retorno humano é feito pelo fluxo no Codex, sem formulários de alteração na tela.
+Acrescentar procedência `retorno_humano`, artefato/hash do retorno e decisões de destino. Correções na redação exigem nova versão, fontes reabertas e revisão assistida própria antes de inclusão em novo briefing. Associar os hashes dos novos relatórios/briefings; não editar os antigos. Publicar, construir uma geração nova e verificar com `achados.py`, conforme o guia. A interface desta entrega consulta os registros; o registro de retorno humano é feito pelo fluxo assistido, sem formulários de alteração na tela.

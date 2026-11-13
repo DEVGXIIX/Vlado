@@ -19,6 +19,27 @@ class AmbienteTest(unittest.TestCase):
         self.assertFalse(result['extracao_pdf']['disponivel'])
         self.assertEqual(result['python'], sys.executable)
 
+    def test_informa_sdks_e_chaves_da_api_sem_expor_valores(self):
+        with patch.dict(os.environ, {'ANTHROPIC_API_KEY': 'sk-ant-nao-exibir', 'OPENAI_API_KEY': ''}):
+            result = diagnostico()
+        api = result['inferencia_api']
+        self.assertEqual(set(api['sdks']), {'anthropic', 'openai'})
+        self.assertEqual(api['chaves'], {'ANTHROPIC_API_KEY': True, 'OPENAI_API_KEY': False})
+        self.assertNotIn('sk-ant-nao-exibir', json.dumps(result))
+
+    def test_sdk_de_api_ausente_nao_e_considerado_pronto(self):
+        real = __import__('importlib').import_module
+
+        def sem_anthropic(name, *args):
+            if name == 'anthropic':
+                raise ImportError('sem anthropic')
+            return real(name, *args)
+
+        with patch('ambiente.importlib.import_module', side_effect=sem_anthropic):
+            result = diagnostico()
+        self.assertFalse(result['inferencia_api']['sdks']['anthropic']['disponivel'])
+        self.assertFalse(result['pronto'])
+
     @unittest.skipUnless(os.name == 'nt', 'Iniciador Windows')
     def test_iniciador_verifica_o_runtime_com_dependencias_sem_abrir_servidor(self):
         root = Path(__file__).resolve().parents[1]

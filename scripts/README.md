@@ -11,13 +11,16 @@ Todos os caminhos internos são resolvidos a partir desta pasta de projeto, sem 
 - `extrair_pdf.py`: função compartilhada que o cadastro chama por padrão para preparar PDFs em Markdown com páginas/linhas e hashes. Depende de `pypdf` (`requirements.txt`); registra páginas sem texto e falhas. Também funciona como CLI avulsa. Não faz OCR, não corrige e não sobrescreve.
 - `indice_sqlite.py`: construção/validação, adaptadores de texto/páginas, busca parametrizada, leitura e cobertura. Usa somente entradas congeladas, sem modelo ou rede.
 - `banco.py`: CLI com `construir`, `buscar`, `ler`, `cobertura` e `verificar`; exige caso/rodada explícitos e preserva retornos brutos. Ver [guia SQLite](../docs/BANCO_SQLITE.md).
-- `interface_pesquisa.py`: servidor em `127.0.0.1` com cadastro, pesquisa documental, achados e conversa integrada ao Codex. O cadastro não cria rodada; o envio da pergunta pela conversa congela uma rodada e constrói seu índice. Execute diretamente ou abra `Iniciar pesquisa.cmd`. Ver [guia da interface](../docs/INTERFACE_PESQUISA.md).
-- `codex_rpc.py` e `codex_apuracao.py`: protocolo do app-server, login, catálogo de modelos, conversas, eventos e ferramentas delimitadas ao corpus da rodada.
+- `interface_pesquisa.py`: servidor em `127.0.0.1` com cadastro, pesquisa documental, achados e conversa com os documentos, cuja inferência usa a API do provedor configurado. O cadastro não cria rodada; o envio da pergunta pela conversa congela uma rodada e constrói seu índice. Execute diretamente ou abra `Iniciar pesquisa.cmd`. Ver [guia da interface](../docs/INTERFACE_PESQUISA.md).
+- `inferencia_api.py`: adaptador `ServidorAPI`, com o mesmo contrato de chamada, envio e notificações que `codex_apuracao.py` já usava. Lê a configuração com `ler_inferencia`; `seguro()` redige chaves; histórico em `conversas/<id>/api_historico.json`, sem imagens; no máximo 60 passos do provedor por etapa; espera de 300 s por chamada de ferramenta; interrupção fecha as chamadas pendentes. Ver [integração](../docs/INTEGRACAO_API.md).
+- `provedor_anthropic.py`: Anthropic Messages API, com streaming, `tool_use`/`tool_result` e cache de prompt pelo `cache_control` de nível superior.
+- `provedor_openai.py`: OpenAI Responses API, sem estado (`store=False`), com streaming, `function_call`/`function_call_output` e itens de raciocínio criptografados reenviados.
+- `codex_apuracao.py`: conversas, eventos e ferramenta `consultar_acervo`, delimitada ao corpus da rodada. Os nomes `codex_*` são mantidos por compatibilidade com rodadas existentes e não indicam uso do Codex.
 - `fluxo_codex.py`: controle das seis etapas, comparação adicional na continuidade documental, validação e publicação automática dos achados.
 - `continuidade.py`: seleção da versão ampliada do corpus, vínculo à última rodada concluída e validação do comparativo entre achados anteriores e atuais.
 - `revisao_humana.py`: marcações humanas em eventos separados, com histórico e vínculo à versão do achado.
 - `lixeira.py`: exclusão lógica e restauração de itens, com preservação dos arquivos.
-- `ambiente.py`: diagnóstico das dependências do interpretador utilizado pelo iniciador.
+- `ambiente.py`: diagnóstico das dependências do interpretador utilizado pelo iniciador, inclusive a disponibilidade dos SDKs `anthropic` e `openai` e a presença de cada chave (apenas verdadeiro ou falso).
 - `apuracao.py`: notas editáveis por caso, com revisões atômicas separadas das fontes, seleções documentais/IA e controle de conflitos entre janelas.
 - `exportar_apuracao.py`: Markdown, PDF real (`reportlab`) e DOCX editável (`python-docx`) com referências legíveis. Ver [aba Apuração](../docs/APURACAO.md).
 

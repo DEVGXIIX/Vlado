@@ -3,3 +3,6 @@ pypdf==6.10.0
 # Exportações do caderno editável da aba Apuração.
 python-docx==1.2.0
 reportlab==4.4.9
+# Inferência via API (provedor em configuracao.json; chave só no ambiente do servidor).
+anthropic==2.8.0
+openai==3.50.0

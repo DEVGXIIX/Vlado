@@ -10,7 +10,7 @@ import stat
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSAO_PROMPTS = '1.3.0'
+VERSAO_PROMPTS = '1.4.0'
 PARTES = (
     '00_REGRAS.md', '01_DESCREVER_CORPUS.md', '02_PLANEJAR.md',
     '03_BUSCAR_E_CRUZAR.md', '04_REVISAR_SUPORTE.md',

@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from comum import ROOT, PARTES, escrever_json, ler_json, sha256
 from cadastrar_documentos import cadastrar
 from codex_apuracao import Conversas, ACTIVE
-from codex_rpc import seguro
+from inferencia_api import seguro
 from indice_achados import verificar
 
 
@@ -32,8 +32,10 @@ def main():
         shutil.copyfile(ROOT / 'prompts' / name, root / 'prompts' / name)
     for name in ('AGENTS.md', 'README.md'):
         shutil.copyfile(ROOT / name, root / name)
+    origem = ler_json(ROOT / 'configuracao.json')
     escrever_json(root / 'configuracao.json', {'caso_ativo': None, 'manifesto_ativo': None,
-        'maximo_documentos_inicial': 20, 'indice_sqlite': True, 'web_na_apuracao': False})
+        'maximo_documentos_inicial': 20, 'indice_sqlite': True, 'web_na_apuracao': False,
+        **{k: origem.get(k) for k in ('provedor', 'modelo_preferido', 'max_tokens_saida') if k in origem}})
     files = []
     for name, content in [('ata.txt', 'MATERIAL SINTÉTICO — TESTE TÉCNICO.\nEm 10 de janeiro de 2040, o grupo fictício Aurora realizou uma reunião.\n'),
                           ('aviso.txt', 'MATERIAL SINTÉTICO — TESTE TÉCNICO.\nEm 15 de janeiro de 2040, o grupo fictício Aurora publicou um aviso sobre a reunião.\n')]:

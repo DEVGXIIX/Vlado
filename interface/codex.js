@@ -1,6 +1,6 @@
 'use strict';
 (() => {
-  let conversation = '', cursor = 0, view = 0, active = false, submitting = false, loginTimer;
+  let conversation = '', cursor = 0, view = 0, active = false, submitting = false;
   let inventoryVersion = 0, catalogVersion = 0, sourceMap = new Map(), messageMap = new Map();
   let currentStage = '';
   let currentGroup = null, currentRound = '', liveInventory = null, authenticated = null;
@@ -9,7 +9,7 @@
   let pendingNotebook = null;
   let pendingDiligences = null;
   const groups = new Map(), frozenInventories = new Map();
-  const drafts = new Map(), approvalCards = new Map();
+  const drafts = new Map();
   let draftContext = {caso:'', conversa:''}, trackingFailed = false, trackingPending = false;
   const draftKey = context => JSON.stringify([context.caso, context.conversa]);
   function saveDraft() {
@@ -34,7 +34,7 @@
   const stageLabels = {inventario:'Conferindo o acervo',plano:'Planejando',busca:'Buscando e lendo fontes',
     geracao_inicial:'Registrando a geração inicial',revisao:'Revisando o suporte',sintese:'Preparando a síntese',comparacao:'Comparando com a análise anterior'};
   const busyStates = new Set(['preparando','executando','aguardando_aprovacao','cancelando','publicando']);
-  const names = {preparando:'Preparando snapshot e índice', executando:'Codex trabalhando',
+  const names = {preparando:'Preparando snapshot e índice', executando:'IA trabalhando',
     aguardando_aprovacao:'Aguardando sua resposta', cancelando:'Cancelamento solicitado',
     concluido:'Execução concluída', interrompido:'Execução interrompida · saídas parciais preservadas',
     erro:'Execução com erro · confira a mensagem', pronto:'Pronto'};
@@ -122,14 +122,13 @@
     pendingNotebook = null; notebookPreview();
     pendingDiligences = null; diligencePreview();
     ++view; conversation = ''; cursor = 0; active = false;
-    trackingFailed = false; trackingPending = false; approvalCards.clear();
+    trackingFailed = false; trackingPending = false;
     switchDraft($('codex-caso').value, '');
     currentStage = '';
     currentGroup = null; currentRound = ''; groups.clear(); frozenInventories.clear();
     sourceMap.clear(); messageMap.clear();
     $('codex-conversa').value = '';
-    for (const id of ['codex-mensagens','codex-fontes','codex-atividades','codex-aprovacoes']) $(id).replaceChildren();
-    $('codex-aprovacoes').hidden = true;
+    for (const id of ['codex-mensagens','codex-fontes','codex-atividades']) $(id).replaceChildren();
     $('codex-versao-editorial').textContent='Nova conversa: os documentos atuais serão preservados ao enviar a pergunta.';
     if($('codex-recibo-alerta'))$('codex-recibo-alerta').hidden=true;
     $('codex-escopo').textContent = 'Nova conversa · o corpus será congelado após a pergunta.';
@@ -149,24 +148,17 @@
     }
   }
   async function status() {
-    clearTimeout(loginTimer);
     try {
       const data = await api('codex-status', {});
-      $('codex-conta').textContent = data.autenticado ? 'Conectado ao ChatGPT' : 'Conecte sua conta ChatGPT';
+      const provider = {anthropic:'Anthropic', openai:'OpenAI'}[data.provedor] || data.provedor || 'API';
+      $('codex-conta').textContent = data.autenticado
+        ? `Conectado à API · ${provider} · ${data.modelo || 'modelo não informado'}`
+        : 'Chave de API ausente no servidor';
       $('codex-conta').classList.toggle('connected', data.autenticado);
-      if (authenticated !== data.autenticado || data.login_pendente) $('codex-conexao').open = !data.autenticado || data.login_pendente;
+      if (authenticated !== data.autenticado) $('codex-conexao').open = !data.autenticado;
       authenticated = data.autenticado;
-      $('codex-conexao-tecnica').replaceChildren(Leitura.tecnicos(`Codex: ${data.versao || 'versão não informada'} · Plano: ${data.plano || 'não informado'}`));
-      $('codex-login').disabled = data.autenticado || data.login_pendente;
-      $('codex-cancelar-login').hidden = !data.login_pendente;
-      $('codex-login-alternativa').hidden = !data.login_pendente;
-      $('codex-login-erro').textContent = data.erro_login || '';
-      $('codex-login-erro').hidden = !data.erro_login;
-      if (data.login_pendente) {
-        $('codex-conta').textContent = 'Conclua o login no navegador';
-        loginTimer = setTimeout(status, 3000);
-      }
-    } catch (error) { $('codex-conta').textContent = 'Codex indisponível.'; fail(error.message); }
+      $('codex-conexao-tecnica').replaceChildren(Leitura.tecnicos(`Integração: ${data.versao || 'versão não informada'} · Provedor: ${provider} · Modelo configurado: ${data.modelo || 'não informado'}`));
+    } catch (error) { $('codex-conta').textContent = 'API indisponível.'; fail(error.message); }
   }
   async function catalogs() {
     const version = ++catalogVersion;
@@ -239,7 +231,7 @@
     const updates = element('details', undefined, 'codex-updates'); updates.open = true;
     const progress = element('div', undefined, 'codex-updates-body');
     progress.tabIndex = 0; progress.setAttribute('role', 'region');
-    progress.setAttribute('aria-label', 'Atualizações de andamento do Codex');
+    progress.setAttribute('aria-label', 'Atualizações de andamento da IA');
     updates.append(element('summary', 'Atualizações de andamento'), progress);
     root.append(user, answers, actions, updates); $('codex-mensagens').append(root);
     currentGroup = {root, answers, actions, updates, progress};
@@ -273,7 +265,7 @@
     const followUpdates = owner.progress.scrollHeight - owner.progress.clientHeight - owner.progress.scrollTop < 48;
     if (!record) {
       const card = element('article', undefined, 'panel codex-message');
-      const label = element('h3', 'Codex · em andamento');
+      const label = element('h3', 'IA · em andamento');
       const body = element('div', '', 'markdown-body'), raw = element('pre', '', 'raw-briefing');
       card.append(label, body, Leitura.tecnicos(raw)); owner.progress.append(card);
       record = {card, body, raw, label, owner, text:'', round, metadata:{}}; messageMap.set(id, record);
@@ -357,7 +349,7 @@
       currentRound = data.rodada;
       $('codex-versao-editorial').textContent=`Documentos desta conversa: versão ${data.corpus_id} · análise ${data.rodada}.`;
       if (currentGroup) groups.set(currentRound, currentGroup);
-      $('codex-escopo').textContent = `${data.caso} / ${data.rodada} · corpus ${data.corpus_id} · modelo informado pelo Codex: ${data.modelo || 'desconhecido'}`;
+      $('codex-escopo').textContent = `${data.caso} / ${data.rodada} · corpus ${data.corpus_id} · modelo informado pela API: ${data.modelo || 'desconhecido'}`;
     } else if (event.tipo === 'ferramenta') {
       $('codex-atividades').append(element('li', `${data.acao}${data.etapa ? ' · ' + data.etapa : ''}${data.retornados !== null && data.retornados !== undefined ? ' · ' + data.retornados + ' trecho(s)' : ''} · ${data.arquivo}`));
     } else if (event.tipo === 'etapa') {
@@ -372,67 +364,10 @@
         } catch (error) { fail(error.message); }
       });
       (groups.get(data.rodada) || currentGroup)?.actions.append(link);
-    } else if (event.tipo === 'plano') {
-      $('codex-atividades').append(element('li', data.plano.map(p => `${p.step}: ${p.status}`).join(' · ')));
+    } else if (event.tipo === 'uso') {
+      const tokens = (uso) => `entrada ${uso.entrada || 0}, saída ${uso.saida || 0}, cache ${uso.cache_leitura || 0}`;
+      $('codex-atividades').append(element('li', `Uso da API${data.etapa ? ' · ' + data.etapa : ''}: ${tokens(data.uso || {})} tokens · total da análise: ${tokens(data.total || {})}`));
     } else if (event.tipo === 'aviso') $('codex-atividades').append(element('li', data.mensagem));
-  }
-  function approvals(items, chatId) {
-    const container = $('codex-aprovacoes'), live = new Set(items.map(item => String(item.id)));
-    for (const [id, record] of approvalCards) {
-      if (!live.has(id)) { record.panel.remove(); approvalCards.delete(id); }
-    }
-    container.hidden = !items.length;
-    for (const item of items) {
-      const id = String(item.id);
-      let record = approvalCards.get(id);
-      if (!record) {
-        const panel = element('section'), reason = element('p'), command = element('pre'), permissions = element('pre');
-        const questions = element('div'), notice = element('p'), button = element('button', '', 'secondary');
-        button.type = 'button'; panel.dataset.solicitacao = id;
-        panel.append(element('h3', 'Codex aguarda uma decisão'), reason, command, permissions, questions, notice, button);
-        record = {panel, reason, command, permissions, questions, notice, button, fields:new Map(), sending:false};
-        approvalCards.set(id, record); container.append(panel);
-        button.addEventListener('click', async () => {
-          if (record.sending) return;
-          record.sending = true; button.disabled = true;
-          try {
-            await api('codex-aprovacao', {conversa:chatId, solicitacao:record.item.id,
-              respostas:Object.fromEntries([...record.fields].map(([key, field]) => [key,{answers:[field.input.value]}]))});
-          } catch (error) {
-            if (approvalCards.get(id) === record && conversation === chatId) {
-              fail(error.message); record.sending = false; button.disabled = false;
-            }
-          }
-        });
-      }
-      record.item = item;
-      record.reason.textContent = item.motivo || '';
-      record.command.textContent = item.comando || ''; record.command.hidden = !item.comando;
-      record.permissions.textContent = item.permissoes ? JSON.stringify(item.permissoes, null, 2) : '';
-      record.permissions.hidden = !item.permissoes;
-      const questions = item.metodo === 'item/tool/requestUserInput' ? item.perguntas || [] : [];
-      const liveQuestions = new Set(questions.map(question => String(question.id)));
-      for (const [key, field] of record.fields) {
-        if (!liveQuestions.has(key)) { field.label.remove(); record.fields.delete(key); }
-      }
-      if (item.metodo === 'item/tool/requestUserInput') {
-        for (const question of questions) {
-          const key = String(question.id);
-          let field = record.fields.get(key);
-          if (!field) {
-            const label = element('label'), text = element('span'), options = element('span', '', 'small'), input = element('input');
-            input.name = key; input.autocomplete = 'off';
-            label.append(text, options, input); record.questions.append(label);
-            field = {label, text, options, input}; record.fields.set(key, field);
-          }
-          field.text.textContent = question.question;
-          field.options.textContent = (question.options || []).map(o => `${o.label}: ${o.description}`).join(' · ');
-        }
-      }
-      record.notice.textContent = questions.length ? '' : 'A apuração fechada não permite ampliar acesso de escrita ou rede. Recuse este pedido ou cancele a execução.';
-      record.notice.hidden = Boolean(questions.length);
-      record.button.textContent = questions.length ? 'Enviar resposta' : 'Recusar solicitação';
-    }
   }
   function watch() {
     if (!conversation || trackingPending) return;
@@ -452,7 +387,6 @@
         for (const entry of data.eventos) event(entry, chatId);
         cursor = data.cursor;
         state(data.conversa.estado);
-        approvals(data.aprovacoes, chatId);
         limitations();
         if (!active && data.eventos.length < 100) { await conversations(); return; }
       } catch (error) {
@@ -472,29 +406,10 @@
     if (!window.confirm('Encerrar o serviço local? As execuções ativas serão interrompidas. As saídas já salvas serão preservadas; será necessário abrir a Mesa novamente para continuar.')) return;
     try {
       await api('codex-desligar', {});
-      ++view; clearTimeout(loginTimer); active = false;
+      ++view; active = false;
       $('codex-status').textContent = 'Serviço encerrado. Para voltar, abra Abrir mesa.vbs.';
-      for (const id of ['codex-enviar','codex-cancelar','codex-login','codex-conectar','codex-desligar']) $(id).disabled = true;
+      for (const id of ['codex-enviar','codex-cancelar','codex-conectar','codex-desligar']) $(id).disabled = true;
     } catch (error) { fail(error.message); }
-  });
-  $('codex-login').addEventListener('click', async () => {
-    fail(); $('codex-login').disabled = true;
-    $('codex-login-erro').hidden = true;
-    $('codex-conta').textContent = 'Iniciando login com ChatGPT…';
-    try {
-      const data = await api('codex-login', {});
-      $('codex-conta').textContent = data.mensagem;
-      $('codex-login-alternativa').hidden = false;
-      await status();
-    } catch (error) {
-      $('codex-conta').textContent = 'Não foi possível iniciar o login.';
-      $('codex-login-erro').textContent = error.message;
-      $('codex-login-erro').hidden = false;
-      $('codex-login').disabled = false;
-    }
-  });
-  $('codex-cancelar-login').addEventListener('click', async () => {
-    try { await api('codex-cancelar-login', {}); await status(); } catch (error) { fail(error.message); }
   });
   $('codex-atualizar').addEventListener('click', async () => { await catalogs(); await conversations(); });
   $('codex-caso').addEventListener('change', async () => { clear(); await conversations(); });

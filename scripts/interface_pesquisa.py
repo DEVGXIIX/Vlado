@@ -301,20 +301,6 @@ class Handler(BaseHTTPRequestHandler):
                              'revisao_humana': True, 'continuar_observacoes': True, 'continuar_documentos': True, 'caderno_humano': True, 'diligencias': True,
                              'extracao_pdf': self.server.ambiente['extracao_pdf']})
             return
-        if path == '/codex-login/browser':
-            cookie = SimpleCookie()
-            try:
-                cookie.load(self.headers.get('Cookie', ''))
-                session = cookie.get('apuracao_session')
-                if (not session or not secrets.compare_digest(session.value, self.server.token)
-                        or self.headers.get('Sec-Fetch-Site', 'same-origin') not in ('same-origin', 'none')):
-                    self._json(403, {'erro': 'Sessão não autorizada. Recarregue a interface antes de abrir o login.'})
-                    return
-                url = self.server.conversas.pagina_login()
-                self._send(303, b'', extra={'Location': url})
-            except (ValueError, KeyError) as exc:
-                self._json(400, {'erro': str(exc)})
-            return
         if path == '/api/catalogo':
             try:
                 self._json(200, catalogo(self.server.root))
@@ -377,8 +363,9 @@ class Handler(BaseHTTPRequestHandler):
             self._json(403, {'erro': 'Origem ou sessão não autorizada. Recarregue a página.'})
             return
         operation = urlsplit(self.path).path.removeprefix('/api/')
-        codex_operations = ('codex-status', 'codex-login', 'codex-cancelar-login', 'codex-listar',
-                            'codex-perguntar', 'codex-eventos', 'codex-cancelar', 'codex-aprovacao', 'codex-original',
+        # Operation names keep the historical "codex-" prefix; inference now goes through the API adapter.
+        codex_operations = ('codex-status', 'codex-listar',
+                            'codex-perguntar', 'codex-eventos', 'codex-cancelar', 'codex-original',
                             'codex-desligar', 'codex-observacoes', 'codex-corpus-previa', 'codex-documentos-cadastrar', 'codex-caderno-previa', 'codex-diligencias-previa')
         if operation not in (*codex_operations, *apuracao.OPERACOES, *CADERNO_OPERACOES, *DILIGENCIAS_OPERACOES, 'analises', 'buscar', 'ler', 'cobertura', 'original', 'cadastrar', 'inventario',
                              'ambiente', 'preparar-pdfs',
@@ -444,10 +431,6 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 if operation == 'codex-status':
                     result = manager.status()
-                elif operation == 'codex-login':
-                    result = manager.entrar()
-                elif operation == 'codex-cancelar-login':
-                    result = manager.cancelar_login()
                 elif operation == 'codex-listar':
                     result = manager.listar(data.get('caso'))
                 elif operation == 'codex-perguntar':
@@ -469,8 +452,6 @@ class Handler(BaseHTTPRequestHandler):
                     result = manager.eventos(data.get('conversa'), data.get('cursor', 0), data.get('espera', 0))
                 elif operation == 'codex-cancelar':
                     result = manager.cancelar(data.get('conversa'))
-                elif operation == 'codex-aprovacao':
-                    result = manager.aprovar(data.get('conversa'), data.get('solicitacao'), data.get('respostas'))
             else:
                 with self.server.cadastro_lock:
                     result = executar(self.server.root, operation, data)
