@@ -1,2 +1,0 @@
-Abra esta pasta como projeto no Codex. Leia AGENTS.md, README.md e ESTADO_ATUAL.md.
-Para iniciar pelo chat, use COMECAR_AQUI.md. A instalação começa sem caso ativo ou pergunta.
