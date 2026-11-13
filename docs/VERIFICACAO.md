@@ -10,7 +10,13 @@
   - custo estimado pelo preço de tabela: cerca de US$ 0,18 (confirmar no painel do provedor);
   - a resposta citou cada documento na linha correta e declarou os limites; não houve conferência humana.
 - **Tentativa anterior:** parou na síntese com "Acesso negado" ao gravar `conversa.json` (duas gravações simultâneas no Windows), depois de cerca de US$ 0,16 em tokens. Corrigido no commit `c91912f`.
-- **Não verificado:** pergunta em inglês sobre PDF em português, os PDFs da Americanas, o provedor Anthropic com chave real, a imagem Docker e a implantação num servidor.
+- **Apagamento definitivo, retomada, caderno com autoria pela conta e teste ponta a ponta** (commits `06ee326` e `0a0d6ce`): suíte completa com 324 testes Python 3.12, todos OK (1 pulado: o iniciador `.cmd`). O teste ponta a ponta (`testes/test_ponta_a_ponta.py`) restaura um backup em outra instalação e confere, pelo HTTP do piloto, originais com o mesmo hash, caderno com autoria, original aberto na página citada, histórico e isolamento entre duas contas. Nenhuma chamada de modelo.
+- **Imagem Docker** (`docker build`, Docker 29.9.3 no Windows, imagem de 238 MB comprimida):
+  - Python 3.12.16, OCRmyPDF 16.10.4, PyMuPDF 1.28.2, Tesseract 5.3.0 com `por`, `eng` e `osd`, Ghostscript 10.00.0, pngquant 2.17.0, unpaper 7.0.0;
+  - OCR real de um PDF só-imagem dentro do container pelo motor `ocrmypdf`, com o texto reconhecido sem erro;
+  - processo como usuário `vlado` (uid 10001), código sem permissão de escrita, pastas de dados graváveis; a imagem não contém chaves, ajustes, convites, casos, testes, `.venv` nem `.git`;
+  - `HEALTHCHECK` chega a `healthy`, `/saude` responde `{"ok": true}` e a página sem convite responde 401; `docker compose config` válido.
+- **Não verificado:** pergunta em inglês sobre PDF em português, os PDFs da Americanas, o provedor Anthropic com chave real, o Caddy com certificado real e a implantação num servidor.
 
 ## Registro anterior (1.3.0)
 

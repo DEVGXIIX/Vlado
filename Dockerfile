@@ -6,9 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 # Local OCR for scanned PDFs (OCRmyPDF engine + direct Tesseract fallback). Nothing leaves the container.
-# Expected bookworm versions (not pinned in apt, so security updates keep applying; UNVERIFIED here,
-# the image could not be built where this was written): tesseract-ocr 5.3.0 (+ -por, -eng, -osd
-# 1:4.1.0), ghostscript 10.0.0, pngquant 2.17.0, unpaper 6.1. OCRmyPDF itself is pinned in requirements.txt.
+# Bookworm versions observed in a build on 13/11/2026 (not pinned in apt, so security updates keep
+# applying): tesseract-ocr 5.3.0 (+ -por, -eng, -osd), ghostscript 10.00.0, pngquant 2.17.0,
+# unpaper 7.0.0. OCRmyPDF itself is pinned in requirements.txt.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        tesseract-ocr tesseract-ocr-por tesseract-ocr-eng tesseract-ocr-osd \
