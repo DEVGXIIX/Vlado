@@ -5,6 +5,7 @@ import argparse
 import base64
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from http.cookies import SimpleCookie
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -17,7 +18,7 @@ import sys
 import tempfile
 import threading
 import uuid
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 import webbrowser
 
 from comum import ROOT, dentro, ler_json, sha256
@@ -286,11 +287,11 @@ class Servidor(ThreadingHTTPServer):
 
 class Handler(BaseHTTPRequestHandler):
     timeout = 60  # seconds per socket operation; long polls answer within 20 s
-    def _send(self, status, content, content_type='application/json; charset=utf-8', extra=None):
+    def _send(self, status, content, content_type='application/json; charset=utf-8', extra=None, cache='no-store'):
         self.send_response(status)
         self.send_header('Content-Type', content_type)
         self.send_header('Content-Length', str(len(content)))
-        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Cache-Control', cache)
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; frame-src 'self' blob:; img-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'none'")
         self.send_header('Referrer-Policy', 'no-referrer')
@@ -365,7 +366,13 @@ class Handler(BaseHTTPRequestHandler):
             return
         cookie = (f'{COOKIE_PILOTO}={sid}; HttpOnly; Secure; SameSite=Strict; Path=/; '
                   f'Max-Age={acesso.SESSAO_HORAS * 3600}')
-        self._send(303, b'', 'text/plain; charset=utf-8', {'Location': '/', 'Set-Cookie': cookie})
+        # Guests land on the ask area; with a single released case it is already selected.
+        try:
+            casos = (acesso.sessao(self.server.root, sid) or {}).get('casos') or []
+        except (ValueError, OSError):
+            casos = []
+        destino = '/?area=codex' + (f'&caso={quote(casos[0], safe="")}' if len(casos) == 1 else '')
+        self._send(303, b'', 'text/plain; charset=utf-8', {'Location': destino, 'Set-Cookie': cookie})
 
     def do_GET(self):
         if not self._allowed():
@@ -438,7 +445,13 @@ class Handler(BaseHTTPRequestHandler):
             extra = {} if piloto else {'Set-Cookie': f'apuracao_session={self.server.token}; HttpOnly; SameSite=Strict; Path=/'}
             self._send(200, content, content_type, extra)
         else:
-            self._send(200, content, content_type)
+            # Static files revalidate on every load (no stale code after an update) but skip the
+            # download when unchanged; index.html stays no-store because it carries session tokens.
+            etag = '"' + hashlib.sha256(content).hexdigest()[:32] + '"'
+            if self.headers.get('If-None-Match') == etag:
+                self._send(304, b'', content_type, {'ETag': etag}, cache='no-cache')
+            else:
+                self._send(200, content, content_type, {'ETag': etag}, cache='no-cache')
 
     def do_POST(self):
         if self.server.modo == 'piloto':

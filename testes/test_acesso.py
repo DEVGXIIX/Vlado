@@ -139,6 +139,27 @@ class PilotoHttpTest(unittest.TestCase):
         status, _, body = self.request('POST', '/api/' + operation, json.dumps(data), headers)
         return status, json.loads(body or b'{}')
 
+    def test_convite_leva_direto_a_pergunta_e_ao_caso_unico(self):
+        _, token = acesso.criar_convite(self.root, 'Uma', casos=['alpha'])
+        status, headers, _ = self.request('GET', '/convite/' + token)
+        self.assertEqual((status, headers['Location']), (303, '/?area=codex&caso=alpha'))
+        _, token = acesso.criar_convite(self.root, 'Duas', casos=['alpha', 'beta'])
+        status, headers, _ = self.request('GET', '/convite/' + token)
+        self.assertEqual((status, headers['Location']), (303, '/?area=codex'))
+
+    def test_arquivos_estaticos_revalidam_com_etag_e_pagina_nao_e_guardada(self):
+        status, headers, corpo = self.request('GET', '/style.css')
+        self.assertEqual((status, headers['Cache-Control']), (200, 'no-cache'))
+        self.assertTrue(corpo)
+        etag = headers['ETag']
+        status, headers, corpo = self.request('GET', '/style.css', headers={'If-None-Match': etag})
+        self.assertEqual((status, corpo, headers['ETag']), (304, b'', etag))
+        status, headers, _ = self.request('GET', '/style.css', headers={'If-None-Match': '"outro"'})
+        self.assertEqual(status, 200)
+        _, headers, _ = self.request('GET', '/', headers={'Cookie': self.cookie})
+        self.assertEqual(headers['Cache-Control'], 'no-store')
+        self.assertNotIn('ETag', headers)
+
     def test_sem_convite_nada_e_acessivel_e_saude_responde(self):
         self.assertEqual(self.request('GET', '/')[0], 401)
         self.assertEqual(self.request('GET', '/api/catalogo')[0], 401)
