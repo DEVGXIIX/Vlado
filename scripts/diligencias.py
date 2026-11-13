@@ -71,7 +71,7 @@ def detalhe(root, case, identifier):
             raise ValueError('Histórico da diligência divergente; nenhuma atualização foi aplicada.')
         caderno._texto(event.get('autor'), 'Autor da atualização', 120)
         current = event['diligencia']
-        if (current.get('estado') not in ESTADOS or current.get('origem_autoria') != 'humana_declarada_na_interface'
+        if (current.get('estado') not in ESTADOS or current.get('origem_autoria') not in caderno.ORIGENS_AUTORIA
                 or not isinstance(current.get('respostas'), list)
                 or state and current['origem'] != state['origem']):
             raise ValueError('Estado ou origem da diligência inválidos.')
@@ -111,7 +111,7 @@ def listar(root, case, *, estado='', responsavel='', texto=''):
     return {'caso': case, 'resultados': result, 'total': len(result)}
 
 
-def salvar(root, data, operation='criar'):
+def salvar(root, data, operation='criar', conta=None):
     fields = {'caso', 'requisicao_id', 'autor', 'observacao'}
     fields |= {'origem', 'acao', 'responsavel', 'prazo'} if operation == 'criar' else {'diligencia_id', 'anterior_sha256'}
     fields |= {'acao', 'responsavel', 'prazo', 'estado'} if operation == 'atualizar' else set()
@@ -125,9 +125,10 @@ def salvar(root, data, operation='criar'):
     identifier = 'G' + rid if operation == 'criar' else data.get('diligencia_id')
     if not isinstance(identifier, str) or not re.fullmatch(ID, identifier):
         raise ValueError('Diligência inválida.')
-    author = caderno._texto(data.get('autor'), 'Autor da atualização', 120)
+    who = caderno.autoria(conta, data.get('autor'), 'Autor da atualização')
+    author = who['autor']
     note = caderno._texto(data.get('observacao', ''), 'Observação', 5000, vazio=operation == 'criar')
-    request_hash = caderno._hash({'operacao': operation, **data})
+    request_hash = caderno._hash(caderno.com_conta({'operacao': operation, **data}, caderno.conta_valida(conta)))
     with caderno._trava(folder):
         records = dentro(folder, identifier)
         current = detalhe(root, case, identifier) if records.exists() else None
@@ -141,7 +142,7 @@ def salvar(root, data, operation='criar'):
             if current:
                 raise ValueError('Diligência já existe.')
             state = {'origem': _origem(root, case, data.get('origem')), 'estado': 'a_solicitar',
-                'origem_autoria': 'humana_declarada_na_interface', 'respostas': [],
+                'origem_autoria': who['origem_autoria'], 'respostas': [],
                 'acao': caderno._texto(data.get('acao'), 'Ação', 1000),
                 'responsavel': caderno._texto(data.get('responsavel'), 'Responsável', 120),
                 'prazo': _prazo(data.get('prazo'))}
@@ -168,12 +169,13 @@ def salvar(root, data, operation='criar'):
                 _, source = caderno._original(root, origin, doc['documento_id'], doc['sha256'])
                 selected.append({**doc, 'nome_recebido': source.get('nome_recebido', doc['documento_id'])}); seen.add(doc['documento_id'])
             state['respostas'].append({'origem': origin, 'origem_id': oid, 'documentos': selected,
-                'observacao': note, 'autor': author, 'recebida_em_utc': datetime.now(timezone.utc).isoformat()})
+                'observacao': note, 'autor': author, 'origem_autoria': who['origem_autoria'], 'recebida_em_utc': datetime.now(timezone.utc).isoformat()})
             state['estado'] = 'resposta_recebida'
         state['atualizada_em_utc'] = datetime.now(timezone.utc).isoformat()
         event = {'esquema': 1, 'caso_id': case, 'id': identifier, 'sequencia': len(current['historico']) + 1 if current else 1,
             'anterior_sha256': current['sha256'] if current else None, 'operacao': operation,
             'requisicao_id': rid, 'solicitacao_sha256': request_hash, 'autor': author,
+            'origem_autoria': who['origem_autoria'], **({'conta_id': who['conta_id']} if 'conta_id' in who else {}),
             'observacao': note, 'em_utc': state['atualizada_em_utc'], 'diligencia': state}
         with pasta_preparacao(folder, '.preparacao_') as staging:
             staged = staging / 'evento.json'; escrever_json(staged, event, exclusivo=True)

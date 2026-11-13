@@ -6,9 +6,13 @@ import uuid
 
 from comum import dentro, escrever_json, ler_json, pasta_preparacao, sha256
 from indice_sqlite import caminho_rodada
+import caderno
 import indice_achados
 from registros_achados import carregar, recibo, trava
 
+ORIGEM_DECLARADA = 'declaracao_do_usuario_na_interface'
+ORIGEM_CONTA = 'conta_autenticada_da_mesa'
+ORIGENS = (ORIGEM_DECLARADA, ORIGEM_CONTA)
 ESTADOS = ('pendente', 'conferida_no_original', 'precisa_de_ajuste', 'sem_suporte_suficiente')
 
 
@@ -36,7 +40,8 @@ def _historico(run, revision, origin):
                 or type(item.get('achado_versao')) is not int or item['achado_versao'] < 1
                 or not isinstance(item.get('observacao'), str) or len(item['observacao']) > 500
                 or not isinstance(item.get('em_utc'), str)
-                or item.get('origem') != 'declaracao_do_usuario_na_interface'
+                or item.get('origem') not in ORIGENS
+                or (item['origem'] == ORIGEM_CONTA and not isinstance(item.get('responsavel'), str))
                 or not re.fullmatch(r'[a-f0-9]{32}', str(item.get('evento_id', '')))):
             raise ValueError('Histórico de revisão humana inválido; marcações não foram carregadas.')
         events.append(item)
@@ -49,7 +54,8 @@ def _marca(events, identifier, version):
     last = history[-1] if history else {}
     return {'estado': last.get('estado', 'pendente'), 'observacao': last.get('observacao', ''),
             'evento_id': last.get('evento_id'), 'atualizada_em_utc': last.get('em_utc'),
-            'origem': 'declaracao_do_usuario_na_interface' if last else None,
+            'origem': last.get('origem') if last else None,
+            'responsavel': last.get('responsavel'),
             'historico': history}
 
 
@@ -154,7 +160,7 @@ def selecionar(root, caso, rodada, revisao, geracao, selecoes):
 
 
 def salvar(root, caso, rodada, revisao, *, achado_id, achado_versao, registros_sha256,
-           estado, observacao='', anterior=None):
+           estado, observacao='', anterior=None, conta=None):
     if estado not in ESTADOS or not isinstance(estado, str):
         raise ValueError('Escolha um dos quatro estados de conferência.')
     if (not isinstance(observacao, str) or len(observacao) > 500
@@ -164,6 +170,7 @@ def salvar(root, caso, rodada, revisao, *, achado_id, achado_versao, registros_s
         raise ValueError('Identidade do achado inválida.')
     if anterior is not None and (not isinstance(anterior, str) or not re.fullmatch(r'[a-f0-9]{32}', anterior)):
         raise ValueError('Identidade da marcação anterior inválida.')
+    conta = caderno.conta_valida(conta)
     run = caminho_rodada(root, caso, rodada)
     with trava(run):
         data, origin = carregar(root, caso, rodada, revisao)
@@ -187,8 +194,10 @@ def salvar(root, caso, rodada, revisao, *, achado_id, achado_versao, registros_s
                 'registros_sha256': origin['registros_sha256'], 'snapshot_sha256': data['snapshot_sha256'],
                 'achado_id': achado_id, 'achado_versao': achado_versao,
                 'estado': estado, 'observacao': observation,
-                'em_utc': datetime.now(timezone.utc).isoformat(), 'responsavel': None,
-                'origem': 'declaracao_do_usuario_na_interface', 'anterior_sha256': previous_hash}
+                'em_utc': datetime.now(timezone.utc).isoformat(), 'responsavel': conta['nome'] if conta else None,
+                'origem': ORIGEM_CONTA if conta else ORIGEM_DECLARADA, 'anterior_sha256': previous_hash}
+        if conta:
+            item['conta_id'] = conta['id']
         folder = _pasta(run, revisao)
         folder.mkdir(parents=True, exist_ok=True)
         with pasta_preparacao(folder, '.preparacao_') as temp:

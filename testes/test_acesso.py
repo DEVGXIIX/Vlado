@@ -187,6 +187,50 @@ class PilotoHttpTest(unittest.TestCase):
         self.assertEqual(self.post('codex-perguntar', {'caso': 'alpha', 'pergunta': 'Teste.',
                                                         'observacoes_humanas': {}})[0], 403)
 
+    def sessao(self, token):
+        status, headers, _ = self.request('GET', '/convite/' + token)
+        self.assertEqual(status, 303)
+        cookie = headers['Set-Cookie'].split(';')[0]
+        page = self.request('GET', '/', headers={'Cookie': cookie})[2].decode('utf-8')
+        return cookie, page.split('name="session-token" content="')[1].split('"')[0]
+
+    def test_admin_do_piloto_assina_notas_pela_conta_e_conflito_vira_409(self):
+        _, token = acesso.criar_convite(self.root, 'Editora', papel='admin')
+        cookie, csrf = self.sessao(token)
+        status, result = self.post('apuracao-nota-salvar', {'caso': 'alpha', 'requisicao_id': 'a' * 32,
+                                                             'titulo': 'Nota', 'texto': 'Texto.'}, cookie, csrf)
+        self.assertEqual(status, 200, result)
+        nota = result['nota']
+        self.assertEqual(nota['criado_por']['nome'], 'Editora')
+        self.assertEqual(nota['criado_por']['origem'], 'conta_autenticada_da_mesa')
+        status, result = self.post('apuracao-nota-salvar', {'caso': 'alpha', 'requisicao_id': 'b' * 32,
+                                                             'nota_id': nota['id'], 'revisao_nota': nota['revisao'] + 5,
+                                                             'titulo': 'Nota', 'texto': 'Outro.'}, cookie, csrf)
+        self.assertEqual(status, 409, result)
+        self.assertEqual(result['codigo'], 'conflito')
+        self.assertEqual(result['atual']['revisao'], nota['revisao'])
+        status, result = self.post('apuracao-notas', {'caso': 'alpha'}, cookie, csrf)
+        self.assertEqual([n['titulo'] for n in result['notas']], ['Nota'])
+        self.assertNotIn('texto', result['notas'][0])
+        self.assertEqual(self.post('apuracao-nota-salvar', {'caso': 'alpha'})[0], 403)
+
+    def test_convidado_nao_envia_corpo_grande_nem_em_operacao_de_cadastro(self):
+        headers = {'Content-Type': 'application/json', 'Cookie': self.cookie, 'X-Session-Token': self.csrf,
+                   'Origin': ORIGEM}
+        status, _, body = self.request('POST', '/api/cadastrar', b'{"x": "' + b'a' * 40000 + b'"}', headers)
+        self.assertEqual(status, 400)
+        self.assertIn('muito grande', json.loads(body)['erro'])
+
+    def test_retomar_do_convidado_devolve_a_cota_quando_recusada(self):
+        self.assertEqual(self.post('codex-retomar', {'conversa': '0' * 32, 'caso': 'alpha'})[0], 403)
+        status, result = self.post('codex-retomar', {'conversa': '0' * 32})
+        self.assertEqual(status, 400, result)
+        self.assertIn('indisponível', result['erro'])
+        status, result = self.post('codex-perguntar', {'caso': 'alpha', 'pergunta': 'Pergunta sintética.'})
+        self.assertEqual(status, 200, result)  # the refused retry gave the only daily question back
+        self.assertTrue(self.manager.rpc.ready.wait(30))
+        self.manager.cancelar(result['conversa'])
+
     def test_registro_de_acesso_corrompido_responde_503(self):
         (self.root / 'acesso/acesso.json').write_text('{quebrado', encoding='utf-8')
         self.assertEqual(self.request('GET', '/', headers={'Cookie': self.cookie})[0], 503)

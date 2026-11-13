@@ -298,6 +298,7 @@ class ServidorAPI:
         if existente is not None and existente.arquivo == arquivo:
             # Same process: keep the live object so a cancelled worker cannot overwrite a newer history.
             self._mesmo_provedor(existente.provedor)
+            self._aparar_turno_incompleto(existente)
             return self._preparar(existente, params)
         try:
             dados = ler_json(arquivo)
@@ -311,7 +312,20 @@ class ServidorAPI:
         atual = self._mesmo_provedor(dados.get('provedor'))
         thread = _Thread(dados['thread'], arquivo, dados.get('ferramentas') or [], dados.get('mensagens') or [],
                          provedor=atual)
+        self._aparar_turno_incompleto(thread)
         return self._preparar(thread, params)
+
+    def _aparar_turno_incompleto(self, thread):
+        """Resuming after a failure: drop trailing user prompts that never got a reply.
+
+        A turn that failed before the provider answered leaves its prompt at the end of the history;
+        the retry sends the prompt again, and two consecutive user messages are not a valid history."""
+        with self.lock:
+            if thread.turno is not None or not thread.ocioso.is_set():
+                return
+            while thread.mensagens and thread.mensagens[-1].get('papel') == 'usuario':
+                thread.mensagens.pop()
+            thread.persistir()
 
     def _mesmo_provedor(self, provedor_da_conversa):
         atual = ler_inferencia(self.root).provedor

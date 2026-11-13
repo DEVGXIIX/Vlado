@@ -48,7 +48,9 @@ IA_OPERACOES = ('ia-config', 'ia-config-salvar')
 # Pilot mode: invitations (admin only) and what an invited guest may call.
 ACESSO_OPERACOES = ('acesso-listar', 'acesso-criar', 'acesso-revogar')
 OPERACOES_CONVIDADO = ('codex-status', 'codex-listar', 'codex-perguntar', 'codex-eventos', 'codex-cancelar',
-                       'codex-original', 'sessao-sair')
+                       'codex-retomar', 'codex-original', 'sessao-sair')
+# Asking and retrying both spend one of the guest's daily questions (given back if refused).
+OPERACOES_COM_COTA = ('codex-perguntar', 'codex-retomar')
 COOKIE_PILOTO = 'vlado_sessao'
 
 
@@ -128,7 +130,8 @@ def catalogo(root):
     return {'casos': result}
 
 
-def executar(root, operation, data):
+def executar(root, operation, data, conta=None):
+    """`conta` is the authenticated pilot account ({'id', 'nome'}); None in local mode."""
     if operation == 'analises':
         case = data.get('caso')
         if not isinstance(case, str) or not re.fullmatch(ID_CASO, case):
@@ -156,13 +159,15 @@ def executar(root, operation, data):
     if operation.startswith('apuracao-'):
         if operation == 'apuracao-listar':
             return apuracao.listar(root, data.get('caso'))
-        return apuracao.alterar(root, operation, data)
+        if operation in apuracao.OPERACOES_NOTAS:
+            return apuracao.executar(root, operation, data, conta)
+        return apuracao.alterar(root, operation, data, conta)
     if operation.startswith('diligencias-'):
         if operation == 'diligencias-listar':
             return diligencias.listar(root, data.get('caso'), estado=data.get('estado', ''),
                 responsavel=data.get('responsavel', ''), texto=data.get('texto', ''))
         if operation in ('diligencias-criar', 'diligencias-atualizar', 'diligencias-responder'):
-            return diligencias.salvar(root, data, operation.split('-')[1])
+            return diligencias.salvar(root, data, operation.split('-')[1], conta)
         raise ValueError('Operação de diligência desconhecida.')
     if operation.startswith('caderno-'):
         case = data.get('caso')
@@ -173,9 +178,9 @@ def executar(root, operation, data):
         if operation == 'caderno-detalhe':
             return caderno.detalhe(root, case, data.get('registro_id'), data.get('sha256'))
         if operation == 'caderno-salvar':
-            return caderno.salvar(root, data)
+            return caderno.salvar(root, data, conta)
         if operation == 'caderno-cruzar':
-            return caderno.cruzar(root, data)
+            return caderno.cruzar(root, data, conta)
         if operation == 'caderno-exportar':
             return caderno.selecionar(root, case, data.get('selecoes'))
         raise ValueError('Operação do caderno desconhecida.')
@@ -198,7 +203,7 @@ def executar(root, operation, data):
             return revisao_humana.salvar(root, case, run, revision,
                 achado_id=data.get('achado_id'), achado_versao=data.get('achado_versao'),
                 registros_sha256=data.get('registros_sha256'), estado=data.get('estado'),
-                observacao=data.get('observacao', ''), anterior=data.get('anterior'))
+                observacao=data.get('observacao', ''), anterior=data.get('anterior'), conta=conta)
         if operation == 'achados-briefing':
             digest = data.get('artefato_sha256')
             if not isinstance(digest, str) or not re.fullmatch(r'[a-f0-9]{64}', digest):
@@ -467,8 +472,11 @@ class Handler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get('Content-Length', '0'))
             operation = urlsplit(self.path).path.removeprefix('/api/')
-            maximum = (72 * 1024 * 1024 if operation in ('cadastrar', 'codex-documentos-cadastrar')
-                       else 2 * 1024 * 1024 if operation in apuracao.OPERACOES
+            principal = self._principal()
+            # Guests only call small JSON operations: never read a large body before the role check.
+            maximum = (32768 if principal is not None and principal['papel'] != 'admin'
+                       else 72 * 1024 * 1024 if operation in ('cadastrar', 'codex-documentos-cadastrar')
+                       else 2 * 1024 * 1024 if operation in (*apuracao.OPERACOES, *apuracao.OPERACOES_NOTAS)
                        else 128 * 1024 if operation in ('caderno-salvar', 'diligencias-criar', 'diligencias-atualizar', 'diligencias-responder') else 32768)
             if not 0 < length <= maximum:
                 raise ValueError('Requisição vazia ou muito grande.')
@@ -492,9 +500,9 @@ class Handler(BaseHTTPRequestHandler):
         operation = urlsplit(self.path).path.removeprefix('/api/')
         # Operation names keep the historical "codex-" prefix; inference now goes through the API adapter.
         codex_operations = ('codex-status', 'codex-listar',
-                            'codex-perguntar', 'codex-eventos', 'codex-cancelar', 'codex-original',
+                            'codex-perguntar', 'codex-retomar', 'codex-eventos', 'codex-cancelar', 'codex-original',
                             'codex-desligar', 'codex-observacoes', 'codex-corpus-previa', 'codex-documentos-cadastrar', 'codex-caderno-previa', 'codex-diligencias-previa')
-        if operation not in (*codex_operations, *apuracao.OPERACOES, *CADERNO_OPERACOES, *DILIGENCIAS_OPERACOES, 'analises', 'buscar', 'ler', 'cobertura', 'original', 'cadastrar', 'inventario',
+        if operation not in (*codex_operations, *apuracao.OPERACOES, *apuracao.OPERACOES_NOTAS, *CADERNO_OPERACOES, *DILIGENCIAS_OPERACOES, 'analises', 'buscar', 'ler', 'cobertura', 'original', 'cadastrar', 'inventario',
                              'ambiente', 'preparar-pdfs',
                              'gerenciar-listar', 'excluir', 'restaurar', 'lixeira-alcance', 'lixeira-apagar', *IA_OPERACOES, *ACESSO_OPERACOES, 'sessao-sair',
                              'achados-revisao-salvar',
@@ -520,7 +528,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, self._acesso(operation, data))
                 return
             consulta_contada = False
-            if operation == 'codex-perguntar' and dono is not None:
+            if operation in OPERACOES_COM_COTA and dono is not None:
                 acesso.registrar_consulta(self.server.root, dono)
                 consulta_contada = True
             if operation == 'ambiente':
@@ -601,6 +609,18 @@ class Handler(BaseHTTPRequestHandler):
                         if consulta_contada:
                             acesso.devolver_consulta(self.server.root, dono)
                         raise
+                elif operation == 'codex-retomar':
+                    try:
+                        result = manager.retomar(data.get('conversa'), dono=dono,
+                                                 casos=(principal['casos'] or []) if dono is not None else None)
+                    except FileNotFoundError as exc:
+                        if consulta_contada:
+                            acesso.devolver_consulta(self.server.root, dono)
+                        raise ValueError('Conversa indisponível para este acesso.') from exc
+                    except Exception:
+                        if consulta_contada:
+                            acesso.devolver_consulta(self.server.root, dono)
+                        raise
                 elif operation == 'codex-observacoes':
                     result = manager.observacoes(data)
                 elif operation == 'codex-corpus-previa':
@@ -619,8 +639,10 @@ class Handler(BaseHTTPRequestHandler):
                 elif operation == 'codex-cancelar':
                     result = manager.cancelar(data.get('conversa'), dono=dono)
             else:
+                conta = ({'id': principal['convite'], 'nome': principal['nome']}
+                         if self.server.modo == 'piloto' else None)
                 with self.server.cadastro_lock:
-                    result = executar(self.server.root, operation, data)
+                    result = executar(self.server.root, operation, data, conta)
             if operation in ('original', 'achados-original'):
                 # Resolve only the original returned by a validated passage, never a client path.
                 run = caminho_rodada(self.server.root, data['caso'], data['rodada'])
@@ -629,6 +651,8 @@ class Handler(BaseHTTPRequestHandler):
                            {'Content-Disposition': 'attachment; filename="original.bin"'})
             else:
                 self._json(400 if result.get('estado') == 'erro_consulta' else 200, result)
+        except apuracao.ConflitoNota as exc:
+            self._json(409, {'estado': 'erro', 'codigo': 'conflito', 'erro': str(exc), 'atual': exc.atual})
         except (ValueError, OSError, KeyError, TypeError, sqlite3.Error) as exc:
             convidado = principal['papel'] != 'admin'
             mensagem = ('Falha ao ler arquivos do servidor.' if convidado and isinstance(exc, OSError) else str(exc))
@@ -648,6 +672,8 @@ class Handler(BaseHTTPRequestHandler):
             return 'Apuração não liberada para este convite.'
         if operation == 'codex-perguntar' and set(data) - {'caso', 'pergunta', 'conversa'}:
             return 'Convidados enviam somente a pergunta e a conversa.'
+        if operation == 'codex-retomar' and set(data) - {'conversa'}:
+            return 'Convidados enviam somente a conversa a retomar.'
         return None
 
     def _acesso(self, operation, data):
