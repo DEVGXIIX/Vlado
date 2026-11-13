@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+from collections import OrderedDict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from http.cookies import SimpleCookie
 import hashlib
@@ -30,6 +31,7 @@ import caderno
 import apuracao
 import exportar_apuracao
 import diligencias
+import erros
 from codex_apuracao import Conversas
 from inferencia_api import resumo_inferencia, salvar_inferencia
 import acesso
@@ -52,6 +54,7 @@ OPERACOES_CONVIDADO = ('codex-status', 'codex-listar', 'codex-perguntar', 'codex
 # Asking and retrying both spend one of the guest's daily questions (given back if refused).
 OPERACOES_COM_COTA = ('codex-perguntar', 'codex-retomar')
 COOKIE_PILOTO = 'vlado_sessao'
+MAXIMO_SESSOES_ORIGINAIS = 5000
 
 
 def receber_documentos(root, data):
@@ -130,7 +133,7 @@ def catalogo(root):
     return {'casos': result}
 
 
-def executar(root, operation, data, conta=None):
+def executar(root, operation, data, conta=None, originais_abertos=None):
     """`conta` is the authenticated pilot account ({'id', 'nome'}); None in local mode."""
     if operation == 'analises':
         case = data.get('caso')
@@ -203,7 +206,8 @@ def executar(root, operation, data, conta=None):
             return revisao_humana.salvar(root, case, run, revision,
                 achado_id=data.get('achado_id'), achado_versao=data.get('achado_versao'),
                 registros_sha256=data.get('registros_sha256'), estado=data.get('estado'),
-                observacao=data.get('observacao', ''), anterior=data.get('anterior'), conta=conta)
+                observacao=data.get('observacao', ''), anterior=data.get('anterior'), conta=conta,
+                originais_abertos=originais_abertos)
         if operation == 'achados-briefing':
             digest = data.get('artefato_sha256')
             if not isinstance(digest, str) or not re.fullmatch(r'[a-f0-9]{64}', digest):
@@ -275,7 +279,21 @@ class Servidor(ThreadingHTTPServer):
         self.ambiente = diagnostico()
         self.cadastro_lock = threading.Lock()
         self.conversas = Conversas(self.root)
+        # Originals opened per page session and frozen revision (memory only; a restart asks to reopen).
+        self._originais = OrderedDict()
+        self._originais_lock = threading.Lock()
         super().__init__(address, Handler)
+
+    def registrar_original(self, chave, evidencia_id):
+        with self._originais_lock:
+            self._originais.setdefault(chave, set()).add(evidencia_id)
+            self._originais.move_to_end(chave)
+            while len(self._originais) > MAXIMO_SESSOES_ORIGINAIS:
+                self._originais.popitem(last=False)
+
+    def originais_abertos(self, chave):
+        with self._originais_lock:
+            return frozenset(self._originais.get(chave, ()))
 
     def server_close(self):
         self.conversas.close()
@@ -312,8 +330,16 @@ class Handler(BaseHTTPRequestHandler):
             # to send a second error response over the already closed socket.
             self.close_connection = True
 
-    def _json(self, status, value):
+    def _json(self, status, value, exc=None):
+        if status >= 400 and isinstance(value, dict) and 'erro' in value and 'codigo' not in value:
+            codigo, parametros = erros.codigo_de(str(value['erro']), exc)
+            value = {**value, 'codigo': codigo, **({'parametros': parametros} if parametros else {})}
         self._send(status, json.dumps(value, ensure_ascii=False).encode('utf-8'))
+
+    def _chave_originais(self, principal, data):
+        """Per page session (never the raw token) and per frozen revision."""
+        sessao = hashlib.sha256(principal['csrf'].encode('ascii')).hexdigest()[:24]
+        return (sessao, *(v if isinstance(v, str) else None for v in (data.get('caso'), data.get('rodada'), data.get('revisao'))))
 
     def _allowed(self):
         if urlsplit(self.path).path == '/saude':
@@ -453,10 +479,13 @@ class Handler(BaseHTTPRequestHandler):
             # Static files revalidate on every load (no stale code after an update) but skip the
             # download when unchanged; index.html stays no-store because it carries session tokens.
             etag = '"' + hashlib.sha256(content).hexdigest()[:32] + '"'
+            # Third-party bundles requested with their version (?v=…) never change under that URL.
+            versionado = name.startswith('vendor/') and re.fullmatch(r'v=[0-9A-Za-z._-]{1,40}', urlsplit(self.path).query)
+            cache = 'public, max-age=31536000, immutable' if versionado else 'no-cache'
             if self.headers.get('If-None-Match') == etag:
-                self._send(304, b'', content_type, {'ETag': etag}, cache='no-cache')
+                self._send(304, b'', content_type, {'ETag': etag}, cache=cache)
             else:
-                self._send(200, content, content_type, {'ETag': etag}, cache='no-cache')
+                self._send(200, content, content_type, {'ETag': etag}, cache=cache)
 
     def do_POST(self):
         if self.server.modo == 'piloto':
@@ -470,7 +499,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
         # Consume bounded bodies even for rejected requests, avoiding TCP resets on Windows.
         try:
-            length = int(self.headers.get('Content-Length', '0'))
+            try:
+                length = int(self.headers.get('Content-Length', '0'))
+            except ValueError as exc:
+                raise ValueError('Requisição vazia ou muito grande.') from exc
             operation = urlsplit(self.path).path.removeprefix('/api/')
             principal = self._principal()
             # Guests only call small JSON operations: never read a large body before the role check.
@@ -641,22 +673,29 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 conta = ({'id': principal['convite'], 'nome': principal['nome']}
                          if self.server.modo == 'piloto' else None)
+                abertos = (self.server.originais_abertos(self._chave_originais(principal, data))
+                           if operation == 'achados-revisao-salvar' else None)
                 with self.server.cadastro_lock:
-                    result = executar(self.server.root, operation, data, conta)
+                    result = executar(self.server.root, operation, data, conta, abertos)
             if operation in ('original', 'achados-original'):
                 # Resolve only the original returned by a validated passage, never a client path.
                 run = caminho_rodada(self.server.root, data['caso'], data['rodada'])
                 path = dentro(run, result['evidencia' if operation == 'achados-original' else 'passagem']['original'])
-                self._send(200, path.read_bytes(), 'application/octet-stream',
+                content = path.read_bytes()
+                if operation == 'achados-original':  # recorded before sending: the next save may race the download
+                    self.server.registrar_original(self._chave_originais(principal, data), data['evidencia_id'])
+                self._send(200, content, 'application/octet-stream',
                            {'Content-Disposition': 'attachment; filename="original.bin"'})
             else:
                 self._json(400 if result.get('estado') == 'erro_consulta' else 200, result)
+        except revisao_humana.OriginalNaoConferido as exc:
+            self._json(400, {'estado': 'erro', 'codigo': 'conferencia_sem_original', 'erro': str(exc), 'faltam': exc.faltam})
         except apuracao.ConflitoNota as exc:
             self._json(409, {'estado': 'erro', 'codigo': 'conflito', 'erro': str(exc), 'atual': exc.atual})
         except (ValueError, OSError, KeyError, TypeError, sqlite3.Error) as exc:
             convidado = principal['papel'] != 'admin'
             mensagem = ('Falha ao ler arquivos do servidor.' if convidado and isinstance(exc, OSError) else str(exc))
-            self._json(400, {'estado': 'erro', 'erro': mensagem})
+            self._json(400, {'estado': 'erro', 'erro': mensagem}, exc)
 
     def _negado(self, operation, data, principal):
         """Authorization by role. Returns the refusal message, or None when allowed."""

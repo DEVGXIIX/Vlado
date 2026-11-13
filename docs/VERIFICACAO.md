@@ -16,6 +16,7 @@
   - OCR real de um PDF só-imagem dentro do container pelo motor `ocrmypdf`, com o texto reconhecido sem erro;
   - processo como usuário `vlado` (uid 10001), código sem permissão de escrita, pastas de dados graváveis; a imagem não contém chaves, ajustes, convites, casos, testes, `.venv` nem `.git`;
   - `HEALTHCHECK` chega a `healthy`, `/saude` responde `{"ok": true}` e a página sem convite responde 401; `docker compose config` válido.
+- **Conferida no original:** o servidor só aceita a marcação depois que a mesma sessão da página abriu, pela Mesa, o original de cada trecho citado naquela revisão (registro em memória; reiniciar o servidor pede para reabrir). É uma proteção do fluxo de trabalho, não prova de leitura: quem tem a sessão pode baixar o original sem lê-lo.
 - **Não verificado:** pergunta em inglês sobre PDF em português, os PDFs da Americanas, o provedor Anthropic com chave real, o Caddy com certificado real e a implantação num servidor.
 
 ## Registro anterior (1.3.0)

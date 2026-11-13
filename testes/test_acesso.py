@@ -214,6 +214,21 @@ class PilotoHttpTest(unittest.TestCase):
         self.assertNotIn('texto', result['notas'][0])
         self.assertEqual(self.post('apuracao-nota-salvar', {'caso': 'alpha'})[0], 403)
 
+    def test_erros_trazem_codigo_estavel_para_a_interface_traduzir(self):
+        status, _, body = self.request('GET', '/api/catalogo')
+        self.assertEqual((status, json.loads(body)['codigo']), (401, 'sessao_expirada'))
+        status, result = self.post('ia-config', {})
+        self.assertEqual((status, result['codigo']), (403, 'operacao_proibida'))
+        self.assertIn('não permitida', result['erro'])  # the Portuguese message is unchanged
+        self.assertEqual(self.post('codex-listar', {'caso': 'beta'})[1]['codigo'], 'caso_nao_liberado')
+        self.assertEqual(self.post('codex-status', {}, csrf='errado')[1]['codigo'], 'origem_nao_autorizada')
+        status, result = self.post('codex-perguntar', {'caso': 'alpha', 'pergunta': 'Pergunta sintética.'})
+        self.assertEqual(status, 200, result)
+        self.assertTrue(self.manager.rpc.ready.wait(30))
+        status, erro = self.post('codex-perguntar', {'caso': 'alpha', 'pergunta': 'Outra.'})
+        self.assertEqual((status, erro['codigo'], erro['parametros']), (400, 'cota_diaria_esgotada', {'cota': 1}))
+        self.manager.cancelar(result['conversa'])
+
     def test_convidado_nao_envia_corpo_grande_nem_em_operacao_de_cadastro(self):
         headers = {'Content-Type': 'application/json', 'Cookie': self.cookie, 'X-Session-Token': self.csrf,
                    'Origin': ORIGEM}
