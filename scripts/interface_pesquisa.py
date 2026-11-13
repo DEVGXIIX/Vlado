@@ -285,6 +285,7 @@ class Servidor(ThreadingHTTPServer):
 
 
 class Handler(BaseHTTPRequestHandler):
+    timeout = 60  # seconds per socket operation; long polls answer within 20 s
     def _send(self, status, content, content_type='application/json; charset=utf-8', extra=None):
         self.send_response(status)
         self.send_header('Content-Type', content_type)
@@ -324,7 +325,13 @@ class Handler(BaseHTTPRequestHandler):
             return None, None
         morsel = cookie.get(COOKIE_PILOTO)
         sid = morsel.value if morsel else None
-        return (acesso.sessao(self.server.root, sid), sid) if sid else (None, None)
+        if not sid:
+            return None, None
+        try:
+            return acesso.sessao(self.server.root, sid), sid
+        except (ValueError, OSError):
+            self.acesso_indisponivel = True  # answered with 503, never with a dropped connection
+            return None, sid
 
     def _principal(self):
         """Who is calling: in local mode the single operator (admin); in pilot mode the invitation session."""
@@ -334,6 +341,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def _proibido(self, mensagem='Operação não permitida para este acesso.'):
         self._json(403, {'estado': 'proibido', 'erro': mensagem})
+
+    def _sem_principal(self, api=False):
+        if getattr(self, 'acesso_indisponivel', False):
+            self._json(503, {'estado': 'indisponivel', 'erro': 'Registro de acesso indisponível. Avise a administração.'})
+        elif api:
+            self._json(401, {'estado': 'sem_sessao', 'erro': 'Sessão expirada ou convite revogado. Abra novamente o link do convite.'})
+        else:
+            self._sem_convite()
 
     def _sem_convite(self):
         texto = ('Acesso somente por convite. Abra o link que você recebeu. / '
@@ -364,7 +379,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._aceitar_convite(path.removeprefix('/convite/'))
                 return
             if path in ('/', '/api/catalogo') and self._principal() is None:
-                self._sem_convite()
+                self._sem_principal(api=path != '/')
                 return
         if path == '/api/integracao':
             self._json(200, {'codex': True, 'protocolo_interface': 1, 'gerenciamento': True,
@@ -426,6 +441,15 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, content, content_type)
 
     def do_POST(self):
+        if self.server.modo == 'piloto':
+            # Never read (up to 72 MB of) a body for anonymous or foreign-host requests.
+            if not self._allowed():
+                self.close_connection = True
+                return
+            if self._principal() is None:
+                self.close_connection = True
+                self._sem_principal(api=True)
+                return
         # Consume bounded bodies even for rejected requests, avoiding TCP resets on Windows.
         try:
             length = int(self.headers.get('Content-Length', '0'))
@@ -443,7 +467,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         principal = self._principal()
         if principal is None:
-            self._json(401, {'estado': 'sem_sessao', 'erro': 'Sessão expirada ou convite revogado. Abra novamente o link do convite.'})
+            self._sem_principal(api=True)
             return
         # Pilot mode requires an explicit Origin; local mode keeps accepting same-origin requests without it.
         origem = self.headers.get('Origin', None if self.server.modo == 'piloto' else self.server.origin)
@@ -482,8 +506,10 @@ class Handler(BaseHTTPRequestHandler):
             if operation in ACESSO_OPERACOES:
                 self._json(200, self._acesso(operation, data))
                 return
+            consulta_contada = False
             if operation == 'codex-perguntar' and dono is not None:
                 acesso.registrar_consulta(self.server.root, dono)
+                consulta_contada = True
             if operation == 'ambiente':
                 result = self.server.ambiente
             elif operation == 'ia-config':
@@ -543,7 +569,12 @@ class Handler(BaseHTTPRequestHandler):
                 elif operation == 'codex-listar':
                     result = manager.listar(data.get('caso'), dono=dono)
                 elif operation == 'codex-perguntar':
-                    result = manager.perguntar(data, dono=dono)
+                    try:
+                        result = manager.perguntar(data, dono=dono)
+                    except Exception:
+                        if consulta_contada:
+                            acesso.devolver_consulta(self.server.root, dono)
+                        raise
                 elif operation == 'codex-observacoes':
                     result = manager.observacoes(data)
                 elif operation == 'codex-corpus-previa':
@@ -573,7 +604,9 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self._json(400 if result.get('estado') == 'erro_consulta' else 200, result)
         except (ValueError, OSError, KeyError, TypeError, sqlite3.Error) as exc:
-            self._json(400, {'estado': 'erro', 'erro': str(exc)})
+            convidado = principal['papel'] != 'admin'
+            mensagem = ('Falha ao ler arquivos do servidor.' if convidado and isinstance(exc, OSError) else str(exc))
+            self._json(400, {'estado': 'erro', 'erro': mensagem})
 
     def _negado(self, operation, data, principal):
         """Authorization by role. Returns the refusal message, or None when allowed."""

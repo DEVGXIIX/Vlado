@@ -14,6 +14,7 @@ import re
 import threading
 
 from cadastrar_documentos import _atomico
+from comum import trava_arquivo
 
 CHAVES_AMBIENTE = {'anthropic': 'ANTHROPIC_API_KEY', 'openai': 'OPENAI_API_KEY'}
 FORMATO = re.compile(r'[A-Za-z0-9_\-.]{20,300}')
@@ -76,7 +77,7 @@ def salvar_chave(root: Path, provedor: str, chave) -> None:
     if not isinstance(chave, str) or not FORMATO.fullmatch(chave.strip()):
         # Never echo the submitted value: it may be a real key with a typo.
         raise ValueError('Chave de API em formato inválido: cole somente a chave, sem espaços (20 a 300 caracteres).')
-    with _TRAVA:
+    with _TRAVA, trava_arquivo(caminho(root)):
         dados = _ler(root)
         dados[provedor] = chave.strip()
         _gravar(root, dados)
@@ -85,7 +86,7 @@ def salvar_chave(root: Path, provedor: str, chave) -> None:
 
 def remover_chave(root: Path, provedor: str) -> None:
     _provedor(provedor)
-    with _TRAVA:
+    with _TRAVA, trava_arquivo(caminho(root)):
         dados = _ler(root)
         if dados.pop(provedor, None) is not None:
             _gravar(root, dados)

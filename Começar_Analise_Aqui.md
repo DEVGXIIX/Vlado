@@ -203,14 +203,14 @@ O acervo público proposto reúne três fatos relevantes da Americanas S.A., de 
 
 ## 11. Ordem de execução com critério de saída
 
-| Marco | Entrega | Pronto quando |
-| --- | --- | --- |
-| M0 Reprodução | Clone no commit de referência, testes e catálogo vazio | Testes verdes; relatório do que foi reproduzido e do que só consta no histórico |
-| M1 Proposta técnica | Escolhas da seção 6, premissas, custos e sequência | Grupo confirma contas, acesso e orçamento |
-| M2 Percurso sintético | Adaptador de API + fluxo de seis etapas + citação até a página, só com dados sintéticos | Métricas bloqueantes da seção 7 em 100% no caso sintético |
-| M3 Desafio de modelos | Sonnet 5.5 × GPT-6.1 Sol no conjunto de validação | Decisão registrada com números em `docs/VERIFICACAO.md` |
-| M4 Hospedagem | Convites, isolamento, inglês, teto de gasto, backup | Checklist da seção 8 aprovado em ambiente de ensaio |
-| M5 Aceite | Pessoa externa conclui o percurso | Critério de aceite registrado; link e convites liberados para a janela |
+| Marco | Entrega | Pronto quando | Situação em 13/11/2026 |
+| --- | --- | --- | --- |
+| M0 Reprodução | Clone no commit de referência, testes e catálogo vazio | Testes verdes; relatório do que foi reproduzido e do que só consta no histórico | Feito localmente (Python 3.11; o projeto pede 3.12) |
+| M1 Proposta técnica | Escolhas da seção 6, premissas, custos e sequência | Grupo confirma contas, acesso e orçamento | Proposta feita; **falta a confirmação do grupo** (seção 12) |
+| M2 Percurso sintético | Adaptador de API + fluxo de seis etapas + citação até a página, só com dados sintéticos | Métricas bloqueantes da seção 7 em 100% no caso sintético | Código pronto e testado com provedores simulados; **falta o ensaio real** (`testes/qa_fluxo_real.py`, gasta crédito) |
+| M3 Desafio de modelos | Sonnet 5.5 × GPT-6.1 Sol no conjunto de validação | Decisão registrada com números em `docs/VERIFICACAO.md` | Os dois provedores funcionam no código; **faltam chaves, PDFs da Americanas e perguntas de referência** |
+| M4 Hospedagem | Convites, isolamento, inglês, teto de gasto, backup | Checklist da seção 8 aprovado em ambiente de ensaio | Modo piloto, convites, interface bilíngue, limites, Docker/Caddy, backup e guia prontos (`docs/IMPLANTACAO_PILOTO.md`); **falta implantar num servidor e passar o checklist** |
+| M5 Aceite | Pessoa externa conclui o percurso | Critério de aceite registrado; link e convites liberados para a janela | Pendente (depende de M2–M4) |
 
 ## 12. Perguntas em aberto **[aberto]**
 

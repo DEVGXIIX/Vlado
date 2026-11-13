@@ -5,6 +5,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 import backup
@@ -47,10 +48,29 @@ class BackupTest(unittest.TestCase):
             backup.restaurar(self.root, arquivo)
         backup.restaurar(self.root, arquivo, substituir=True)
 
+    def test_falha_no_meio_da_restauracao_preserva_os_dados_atuais(self):
+        arquivo = backup.criar(self.root, self.base / 'copias')
+        (self.root / 'conversas/a/conversa.json').write_text('{"atual": true}', encoding='utf-8')
+        chamadas = {'n': 0}
+        original = backup.shutil.copyfileobj
+
+        def falha_no_segundo(origem, destino, *args):
+            chamadas['n'] += 1
+            if chamadas['n'] == 2:
+                raise OSError('disco cheio (simulado)')
+            return original(origem, destino, *args)
+
+        with patch('backup.shutil.copyfileobj', side_effect=falha_no_segundo):
+            with self.assertRaises(OSError):
+                backup.restaurar(self.root, arquivo, substituir=True)
+        self.assertEqual((self.root / 'conversas/a/conversa.json').read_text(encoding='utf-8'), '{"atual": true}')
+        self.assertTrue((self.root / 'casos/catalogo.json').is_file())
+        self.assertEqual([p.name for p in self.root.iterdir() if p.name.startswith('.')], [])
+
     def test_restaurar_recusa_caminhos_fora_das_pastas_de_dados(self):
         malicioso = self.base / 'malicioso.tar.gz'
         with tarfile.open(malicioso, 'w:gz') as pacote:
-            for nome in ('../fora.txt', 'scripts/acesso.py', 'casos/../../fora.txt'):
+            for nome in ('../fora.txt', 'scripts/acesso.py', 'casos/../../fora.txt', 'casos/..\\..\\fora.txt', 'casos/C:fora'):
                 dados = b'x'
                 info = tarfile.TarInfo(nome)
                 info.size = len(dados)

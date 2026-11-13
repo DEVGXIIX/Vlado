@@ -61,6 +61,27 @@ class AcessoTest(unittest.TestCase):
         for _ in range(5):
             acesso.registrar_consulta(self.root, admin['id'])
 
+    def test_consulta_devolvida_volta_para_a_cota(self):
+        registro, _ = acesso.criar_convite(self.root, 'D', casos=['alpha'], cota_diaria=1)
+        acesso.registrar_consulta(self.root, registro['id'])
+        acesso.devolver_consulta(self.root, registro['id'])
+        acesso.registrar_consulta(self.root, registro['id'])
+
+    def test_registros_simultaneos_nao_perdem_contagem(self):
+        registro, _ = acesso.criar_convite(self.root, 'E', casos=['alpha'], cota_diaria=500)
+        threads = [threading.Thread(target=acesso.registrar_consulta, args=(self.root, registro['id'])) for _ in range(20)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        self.assertEqual(acesso.registrar_consulta(self.root, registro['id']), 21)
+
+    def test_arquivo_de_acesso_corrompido_gera_erro_claro(self):
+        (self.root / 'acesso').mkdir()
+        (self.root / 'acesso/acesso.json').write_text('[]', encoding='utf-8')
+        with self.assertRaisesRegex(ValueError, 'ilegível'):
+            acesso.listar(self.root)
+
     def test_entradas_invalidas(self):
         for kwargs in ({'nome': ''}, {'nome': 'x', 'papel': 'root'}, {'nome': 'x', 'casos': ['../a']},
                        {'nome': 'x', 'cota_diaria': 0}, {'nome': 'x', 'dias': 0}):
@@ -145,7 +166,14 @@ class PilotoHttpTest(unittest.TestCase):
         self.assertEqual(self.post('codex-perguntar', {'caso': 'alpha', 'pergunta': 'Teste.',
                                                         'observacoes_humanas': {}})[0], 403)
 
+    def test_registro_de_acesso_corrompido_responde_503(self):
+        (self.root / 'acesso/acesso.json').write_text('{quebrado', encoding='utf-8')
+        self.assertEqual(self.request('GET', '/', headers={'Cookie': self.cookie})[0], 503)
+        self.assertEqual(self.post('codex-status', {})[0], 503)
+
     def test_conversas_isoladas_por_convidado_cota_e_revogacao(self):
+        status, result = self.post('codex-perguntar', {'caso': 'alpha', 'pergunta': ''})
+        self.assertEqual(status, 400)  # refused question does not spend the daily quota
         status, result = self.post('codex-perguntar', {'caso': 'alpha', 'pergunta': 'Pergunta sintética.'})
         self.assertEqual(status, 200, result)
         conversa = result['conversa']

@@ -48,9 +48,10 @@ Valores inválidos falham com erro claro antes de qualquer chamada ao modelo.
 
 ## Chaves de API
 
-- Ficam **somente** nas variáveis de ambiente do processo do servidor: `ANTHROPIC_API_KEY` ou `OPENAI_API_KEY`, conforme o provedor escolhido.
-- Nunca vão para configuração, navegador, eventos, logs, histórico ou git.
-- Defina a variável antes de abrir a Mesa. Com **Abrir mesa.vbs**, ela precisa estar disponível ao Windows (variável de usuário ou de sistema); com **Iniciar pesquisa.cmd**, basta estar definida no terminal que o inicia. Reinicie o servidor se ele já estava aberto.
+- **Pela Mesa:** em **Perguntar à IA › Conexão e opções**, escolha o provedor e o modelo (opcional), cole a chave e salve. A escolha de provedor/modelo vai para `ajustes/inferencia.json` (sobrepõe `configuracao.json` sem alterá-lo); a chave vai para `segredos/chaves.json`, ou para o caminho em `VLADO_SEGREDOS`. As duas pastas ficam fora do git. O navegador só recebe se há chave, sua origem e os 4 últimos caracteres. No modo piloto, só administradores alteram provedor e chave.
+- **Pelo ambiente:** `ANTHROPIC_API_KEY` ou `OPENAI_API_KEY` no processo do servidor têm prioridade sobre a chave salva.
+- Nunca vão para configuração versionada, navegador, eventos, logs, histórico ou git; `seguro()` apaga das mensagens os valores conhecidos. Backups (`scripts/backup.py`) só incluem chaves com `--incluir-segredos`.
+- Para usar a variável de ambiente, defina-a antes de abrir a Mesa. Com **Abrir mesa.vbs**, ela precisa estar disponível ao Windows (variável de usuário ou de sistema); com **Iniciar pesquisa.cmd**, basta estar definida no terminal que o inicia. Reinicie o servidor se ele já estava aberto.
 - Sem a chave, a pergunta é recusada com "Chave de API ausente…" e a Mesa mostra **Chave de API ausente no servidor**.
 - Com a chave presente, a área de conversa mostra **Conectado à API · \<Provedor\> · \<modelo\>**.
 - `scripts/ambiente.py` informa apenas se cada chave está definida (verdadeiro ou falso) e se os SDKs estão disponíveis. O estado "pronto" exige os dois SDKs.

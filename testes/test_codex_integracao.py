@@ -310,6 +310,13 @@ class CodexIntegrationTest(unittest.TestCase):
         self.assertTrue(any(e['tipo'] == 'erro' and 'configuracao.json' in e['dados']['mensagem']
                             for e in self.manager.eventos(identifier)['eventos']))
 
+    def test_convite_tem_no_maximo_uma_pergunta_em_andamento(self):
+        primeira = self.manager.perguntar({'caso': 'alpha', 'pergunta': 'Primeira.'}, dono='convite-1')['conversa']
+        self.assertTrue(self.manager.rpc.ready.wait(30))
+        with self.assertRaisesRegex(ValueError, 'em andamento'):
+            self.manager.perguntar({'caso': 'alpha', 'pergunta': 'Segunda.'}, dono='convite-1')
+        self.manager.cancelar(primeira)
+
     def test_porta_exclusiva_impede_dois_backends(self):
         server = Servidor(('127.0.0.1', 0), self.root)
         self.addCleanup(server.server_close)

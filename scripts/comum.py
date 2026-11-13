@@ -50,6 +50,31 @@ def escrever_json(path: Path, value, exclusivo: bool = False):
 
 
 @contextmanager
+def trava_arquivo(caminho: Path):
+    """Exclusive advisory lock across processes (server and CLI) for a small JSON store."""
+    import os
+    trava = Path(str(caminho) + '.lock')
+    trava.parent.mkdir(parents=True, exist_ok=True)
+    with open(trava, 'a+b') as stream:
+        if os.name == 'nt':
+            import msvcrt
+            stream.seek(0)
+            msvcrt.locking(stream.fileno(), msvcrt.LK_LOCK, 1)  # retries for ~10 s, then OSError
+            try:
+                yield
+            finally:
+                stream.seek(0)
+                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(stream, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(stream, fcntl.LOCK_UN)
+
+
+@contextmanager
 def pasta_preparacao(parent: Path, prefix: str):
     """Stage project artifacts with their parent's ACL, including on Windows.
 

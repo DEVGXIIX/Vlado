@@ -40,7 +40,9 @@ class AmbienteTest(unittest.TestCase):
         self.assertFalse(result['inferencia_api']['sdks']['anthropic']['disponivel'])
         self.assertFalse(result['pronto'])
 
-    @unittest.skipUnless(os.name == 'nt', 'Iniciador Windows')
+    # Opens a console window (cmd.exe); run only on request: VLADO_TESTAR_INICIADOR=1.
+    @unittest.skipUnless(os.name == 'nt' and os.environ.get('VLADO_TESTAR_INICIADOR') == '1',
+                         'Iniciador Windows: defina VLADO_TESTAR_INICIADOR=1 para executar')
     def test_iniciador_verifica_o_runtime_com_dependencias_sem_abrir_servidor(self):
         root = Path(__file__).resolve().parents[1]
         result = subprocess.run(['cmd.exe', '/d', '/c', 'call', 'Iniciar pesquisa.cmd', '--verificar-runtime'],

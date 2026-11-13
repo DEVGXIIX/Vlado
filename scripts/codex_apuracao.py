@@ -318,6 +318,9 @@ class Conversas:
                 feedback = self.observacoes({**request, 'caso': case})
                 if feedback['conversa'] != identifier:
                     raise ValueError('As observações pertencem a outra conversa. Use Continuar com estas observações.')
+            if dono is not None and any(c['meta'].get('dono') == dono and c.get('busy')
+                                        for c in self.contexts.values()):
+                raise ValueError('Já há uma pergunta em andamento para este convite. Aguarde a resposta ou cancele.')
             if identifier:
                 ctx = self._conferir_dono(identifier, dono)
                 if ctx['meta']['caso'] != case:

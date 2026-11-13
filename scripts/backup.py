@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PASTAS = ('casos', 'conversas', 'execucoes', 'lixeira', 'entrada', 'acesso', 'ajustes')
 SEGREDOS = 'segredos'
 MANIFESTO = 'manifesto_backup.json'
+PROIBIDOS = (chr(92), ':', chr(0))  # backslash (Windows separator), drive letter, NUL
 
 
 def _pastas(incluir_segredos: bool) -> tuple[str, ...]:
@@ -50,15 +51,32 @@ def criar(root: Path, destino: Path, incluir_segredos: bool = False) -> Path:
 
 
 def _conferir(membro: tarfile.TarInfo) -> None:
-    caminho = PurePosixPath(membro.name)
-    if (membro.name == MANIFESTO and membro.isfile()):
+    if membro.name == MANIFESTO and membro.isfile():
         return
-    if (caminho.is_absolute() or '..' in caminho.parts or not caminho.parts
-            or caminho.parts[0] not in PASTAS + (SEGREDOS,) or not (membro.isfile() or membro.isdir())):
+    caminho = PurePosixPath(membro.name)
+    if (any(c in membro.name for c in PROIBIDOS) or caminho.is_absolute() or '..' in caminho.parts
+            or not caminho.parts or caminho.parts[0] not in PASTAS + (SEGREDOS,)
+            or not (membro.isfile() or membro.isdir())):
         raise ValueError(f'O backup contém um item fora das pastas de dados: {membro.name!r}. Nada foi restaurado.')
 
 
+def _extrair(pacote: tarfile.TarFile, membros, destino: Path) -> None:
+    for membro in membros:
+        if membro.name == MANIFESTO:
+            continue
+        alvo = destino / PurePosixPath(membro.name)
+        if not alvo.resolve().is_relative_to(destino.resolve()):
+            raise ValueError(f'O backup contém um item fora das pastas de dados: {membro.name!r}. Nada foi restaurado.')
+        if membro.isdir():
+            alvo.mkdir(parents=True, exist_ok=True)
+            continue
+        alvo.parent.mkdir(parents=True, exist_ok=True)
+        with pacote.extractfile(membro) as origem, alvo.open('xb') as saida:
+            shutil.copyfileobj(origem, saida)
+
+
 def _restaurar_pacote(root: Path, pacote: tarfile.TarFile, substituir: bool) -> list[str]:
+    """Extract into a staging folder, then swap folder by folder; any failure restores the previous data."""
     membros = pacote.getmembers()
     for membro in membros:
         _conferir(membro)
@@ -67,19 +85,35 @@ def _restaurar_pacote(root: Path, pacote: tarfile.TarFile, substituir: bool) -> 
     if ocupadas and not substituir:
         raise ValueError(f'O destino já contém dados em {", ".join(ocupadas)}. Use --substituir para trocar por este backup.')
     root.mkdir(parents=True, exist_ok=True)
-    for pasta in pastas:
-        if (root / pasta).exists():
-            shutil.rmtree(root / pasta)
-    for membro in membros:
-        if membro.name == MANIFESTO:
-            continue
-        alvo = root / PurePosixPath(membro.name)
-        if membro.isdir():
-            alvo.mkdir(parents=True, exist_ok=True)
-            continue
-        alvo.parent.mkdir(parents=True, exist_ok=True)
-        with pacote.extractfile(membro) as origem, alvo.open('xb') as saida:
-            shutil.copyfileobj(origem, saida)
+    marca = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%f')
+    preparo = root / f'.restaurando-{marca}'
+    trocadas = []
+    try:
+        preparo.mkdir()
+        _extrair(pacote, membros, preparo)
+        for pasta in pastas:
+            antiga = root / f'.antiga-{pasta}-{marca}'
+            if (root / pasta).exists():
+                (root / pasta).rename(antiga)
+                trocadas.append((pasta, antiga))
+            else:
+                trocadas.append((pasta, None))
+            (preparo / pasta if (preparo / pasta).exists() else preparo / pasta).mkdir(parents=True, exist_ok=True)
+            (preparo / pasta).rename(root / pasta)
+    except BaseException:
+        for pasta, antiga in reversed(trocadas):
+            if antiga is not None and antiga.exists():
+                if (root / pasta).exists():
+                    shutil.rmtree(root / pasta)
+                antiga.rename(root / pasta)
+            elif antiga is None and (root / pasta).exists():
+                shutil.rmtree(root / pasta)
+        raise
+    finally:
+        shutil.rmtree(preparo, ignore_errors=True)
+    for _, antiga in trocadas:
+        if antiga is not None:
+            shutil.rmtree(antiga, ignore_errors=True)
     return pastas
 
 

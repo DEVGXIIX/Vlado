@@ -11,9 +11,10 @@ COPY requirements.txt requirements-opcional.txt ./
 RUN pip install --no-cache-dir -r requirements.txt -r requirements-opcional.txt
 
 COPY . .
-# Data folders are Docker volumes (see docker-compose.yml); create them owned by the app user.
+# Data folders are Docker volumes (see docker-compose.yml). Only they are writable by the
+# app user; the code stays read-only for it.
 RUN mkdir -p casos conversas execucoes lixeira entrada segredos ajustes acesso \
-    && chown -R vlado:vlado /app
+    && chown -R vlado:vlado casos conversas execucoes lixeira entrada segredos ajustes acesso
 USER vlado
 
 EXPOSE 8765

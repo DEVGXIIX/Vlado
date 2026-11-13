@@ -27,6 +27,7 @@ import threading
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cadastrar_documentos import _atomico  # noqa: E402
+from comum import trava_arquivo  # noqa: E402
 
 PAPEIS = ('admin', 'convidado')
 ID_CASO = re.compile(r'[a-z0-9][a-z0-9_-]{0,63}')
@@ -63,6 +64,8 @@ def _ler(root: Path) -> dict:
         dados = json.loads(arquivo.read_text(encoding='utf-8'))
     except (OSError, ValueError) as exc:
         raise ValueError('Registro de acesso ilegível; restaure o backup de acesso/.') from exc
+    if not isinstance(dados, dict) or not all(isinstance(dados.get(c, {}), dict) for c in ('convites', 'sessoes', 'uso')):
+        raise ValueError('Registro de acesso ilegível; restaure o backup de acesso/.')
     for chave in ('convites', 'sessoes', 'uso'):
         dados.setdefault(chave, {})
     return dados
@@ -112,7 +115,7 @@ def criar_convite(root: Path, nome, papel='convidado', casos=(), cota_diaria=20,
                'cota_diaria': cota_diaria if papel == 'convidado' else None,
                'expira_em': _iso(momento + timedelta(days=dias)), 'criado_em': _iso(momento),
                'revogado': False, 'token_sha256': _hash(token)}
-    with _TRAVA:
+    with _TRAVA, trava_arquivo(caminho(root)):
         dados = _ler(root)
         dados['convites'][cid] = convite
         _gravar(root, dados)
@@ -121,13 +124,13 @@ def criar_convite(root: Path, nome, papel='convidado', casos=(), cota_diaria=20,
 
 def listar(root: Path) -> list[dict]:
     momento = agora()
-    with _TRAVA:
+    with _TRAVA, trava_arquivo(caminho(root)):
         return [_publico(cid, c, momento) for cid, c in sorted(_ler(root)['convites'].items(),
                                                               key=lambda item: item[1]['criado_em'])]
 
 
 def revogar(root: Path, cid) -> dict:
-    with _TRAVA:
+    with _TRAVA, trava_arquivo(caminho(root)):
         dados = _ler(root)
         convite = dados['convites'].get(cid) if isinstance(cid, str) else None
         if not convite:
@@ -143,7 +146,7 @@ def aceitar(root: Path, token) -> tuple[str, str]:
     if not isinstance(token, str) or not 20 <= len(token) <= 100:
         raise ValueError('Convite inválido ou revogado.')
     momento = agora()
-    with _TRAVA:
+    with _TRAVA, trava_arquivo(caminho(root)):
         dados = _ler(root)
         digest = _hash(token)
         cid = next((k for k, c in dados['convites'].items()
@@ -165,7 +168,7 @@ def sessao(root: Path, sid) -> dict | None:
     if not isinstance(sid, str) or not 20 <= len(sid) <= 100:
         return None
     momento = agora()
-    with _TRAVA:
+    with _TRAVA, trava_arquivo(caminho(root)):
         dados = _ler(root)
         registro = dados['sessoes'].get(_hash(sid))
         if not registro or _data(registro['expira_em']) <= momento:
@@ -181,7 +184,7 @@ def sessao(root: Path, sid) -> dict | None:
 def encerrar(root: Path, sid) -> None:
     if not isinstance(sid, str):
         return
-    with _TRAVA:
+    with _TRAVA, trava_arquivo(caminho(root)):
         dados = _ler(root)
         if dados['sessoes'].pop(_hash(sid), None) is not None:
             _gravar(root, dados)
@@ -190,7 +193,7 @@ def encerrar(root: Path, sid) -> None:
 def registrar_consulta(root: Path, cid: str) -> int:
     """Count one question for today (UTC). Guests over their daily quota are refused."""
     dia = agora().strftime('%Y-%m-%d')
-    with _TRAVA:
+    with _TRAVA, trava_arquivo(caminho(root)):
         dados = _ler(root)
         convite = dados['convites'].get(cid)
         if not _valido(convite, agora()):
@@ -202,6 +205,17 @@ def registrar_consulta(root: Path, cid: str) -> int:
         dados['uso'][cid] = {dia: feitas + 1}  # keep only today
         _gravar(root, dados)
         return feitas + 1
+
+
+def devolver_consulta(root: Path, cid: str) -> None:
+    """Give back today's question when the server refused it after counting."""
+    dia = agora().strftime('%Y-%m-%d')
+    with _TRAVA, trava_arquivo(caminho(root)):
+        dados = _ler(root)
+        feitas = dados['uso'].get(cid, {}).get(dia, 0)
+        if feitas > 0:
+            dados['uso'][cid] = {dia: feitas - 1}
+            _gravar(root, dados)
 
 
 def _principal() -> int:

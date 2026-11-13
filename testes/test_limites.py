@@ -45,6 +45,11 @@ class LimitesTest(unittest.TestCase):
             limites.conferir_dia(self.root)
             self.assertEqual(limites.somar_dia(self.root, 1), 1)
 
+    def test_contador_corrompido_nao_quebra_a_soma(self):
+        (self.root / 'ajustes').mkdir()
+        (self.root / 'ajustes/uso_diario.json').write_text(json.dumps({'dia': limites.hoje(), 'tokens': 'x'}), encoding='utf-8')
+        self.assertEqual(limites.somar_dia(self.root, 5), 5)
+
     def test_texto_e_argumentos_grandes_sao_truncados_com_aviso(self):
         curto = 'abc'
         self.assertEqual(limitar_texto(curto, 10), curto)

@@ -12,7 +12,7 @@ from pathlib import Path
 import threading
 
 from cadastrar_documentos import _atomico
-from comum import ler_json
+from comum import ler_json, trava_arquivo
 
 PADROES = {'tokens_por_consulta': 3_000_000, 'tokens_por_dia': 30_000_000}
 _TRAVA = threading.Lock()
@@ -49,11 +49,14 @@ def _total(root: Path) -> int:
         dados = json.loads(arquivo.read_text(encoding='utf-8'))
     except (OSError, ValueError):
         return 0  # a damaged counter must not block the installation; it restarts from zero
-    return dados.get('tokens', 0) if isinstance(dados, dict) and dados.get('dia') == hoje() else 0
+    if not isinstance(dados, dict) or dados.get('dia') != hoje():
+        return 0
+    tokens = dados.get('tokens', 0)
+    return tokens if type(tokens) is int and tokens >= 0 else 0
 
 
 def somar_dia(root: Path, tokens: int) -> int:
-    with _TRAVA:
+    with _TRAVA, trava_arquivo(_arquivo(root)):
         total = _total(root) + max(0, int(tokens))
         arquivo = _arquivo(root)
         arquivo.parent.mkdir(parents=True, exist_ok=True)
