@@ -129,7 +129,10 @@ test('envio mostra “Apagando…”, bloqueia os botões e, no sucesso, fecha, 
 });
 
 test('conteúdo alterado desde a conferência recarrega o alcance e pede nova confirmação', async () => {
-  const {mesa, liberar} = await abrirDialogo({apagar: () => { throw new Error(MUDOU); }});
+  // Recognised by the server's stable code, whatever the message language.
+  const alterado = () => { throw Object.assign(new Error('Contents changed (server text)'),
+    {result: {estado: 'erro', codigo: 'alcance_alterado', erro: 'Texto diferente do servidor.'}}); };
+  const {mesa, liberar} = await abrirDialogo({apagar: alterado});
   await liberar();
   digitar(mesa, 'conversa velha');
   mesa.$('apagar-confirmar').click();

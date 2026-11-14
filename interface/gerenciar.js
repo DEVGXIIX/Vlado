@@ -204,8 +204,8 @@
     } catch (error) {
       captured.busy = false;
       if (pending !== captured) return;
-      // Matched on the server's own text: the message shown may already be in English.
-      if (/mudou desde a conferência/.test(error.result?.erro || error.message)) {
+      // Stable code from the server (8f03d9c); the PT text is only a fallback for older servers.
+      if (error.result?.codigo === 'alcance_alterado' || /mudou desde a conferência/.test(error.result?.erro || '')) {
         deleteError('O conteúdo mudou desde a conferência. Confira o alcance atualizado e digite o nome de novo.');
         await loadScope();
       } else { deleteError(error.message); deleteControls(); }
