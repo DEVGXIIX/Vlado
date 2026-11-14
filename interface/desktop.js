@@ -51,9 +51,10 @@
     }
   }
   function geometry() {
+    // The composer height keeps anchored content clear of the sticky form at every width.
+    document.documentElement.style.setProperty('--mesa-composer-height',`${form.getBoundingClientRect().height}px`);
     if (!desktop.matches) return;
     document.documentElement.style.setProperty('--mesa-header-height',`${header.getBoundingClientRect().height}px`);
-    document.documentElement.style.setProperty('--mesa-composer-height',`${form.getBoundingClientRect().height}px`);
   }
   const resize = new ResizeObserver(geometry);
   resize.observe(header);resize.observe(form);
@@ -68,15 +69,31 @@
     if (caption.textContent !== text) caption.textContent = text;
   }
   window.abrirComposicaoMesa = () => {
-    if (!desktop.matches || !body) return;
+    if (!body) return;
     collapsed = false;renderComposer();
   };
+  // The composer folds at every width. On a desktop it gives way to an answer; on a narrow
+  // screen, where it would hold a third of the viewport, it gives way to the conversation.
+  function buildComposer() {
+    body = element('div');body.id = 'desktop-composicao';
+    body.append(...form.childNodes);
+    toolbar = element('div',undefined,'desktop-composer-toolbar');
+    caption = element('span','Sua pergunta','small');
+    toggle = element('button','Recolher pergunta','secondary');toggle.type = 'button';
+    toggle.id = 'desktop-composicao-alternar';toggle.setAttribute('aria-controls',body.id);
+    toggle.addEventListener('click',() => {
+      collapsed = !collapsed;renderComposer();
+      if (!collapsed) $('codex-pergunta').focus();
+      else toggle.focus();
+    });
+    toolbar.append(caption,toggle);form.append(toolbar,body);
+  }
   function composerState() {
-    if (!body || !desktop.matches) return;
-    const hasAnswer = !!$('codex-mensagens').querySelector('.codex-answer');
+    if (!body) return;
+    const hasAnswer = !!$('codex-mensagens').querySelector(desktop.matches ? '.codex-answer' : '.codex-user,.codex-answer');
     const hasPending = [...body.querySelectorAll('.feedback-preview')].some(panel => !panel.hidden);
     if (hasPending) collapsed = false;
-    else if (hasAnswer && !hadAnswer && !$('codex-pergunta').value.trim() && !form.contains(document.activeElement)) collapsed = true;
+    else if (hasAnswer && !hadAnswer && !$('codex-pergunta').value.trim() && document.activeElement !== $('codex-pergunta')) collapsed = true;
     else if (!hasAnswer && hadAnswer) collapsed = false;
     hadAnswer = hasAnswer;
     renderComposer();
@@ -115,19 +132,6 @@
         item.button.removeAttribute('id');item.button.replaceWith(link);item.link = link;
       }
       window.limitarNavegacaoConvidado?.();
-      body = element('div');body.id = 'desktop-composicao';
-      body.append(...form.childNodes);
-      toolbar = element('div',undefined,'desktop-composer-toolbar');
-      caption = element('span','Sua pergunta','small');
-      toggle = element('button','Recolher pergunta','secondary');toggle.type = 'button';
-      toggle.id = 'desktop-composicao-alternar';toggle.setAttribute('aria-controls',body.id);
-      toggle.addEventListener('click',() => {
-        collapsed = !collapsed;renderComposer();
-        if (!collapsed) $('codex-pergunta').focus();
-        else toggle.focus();
-      });
-      toolbar.append(caption,toggle);form.append(toolbar,body);
-      collapsed = false;hadAnswer = false;composerState();
       const findingsForm = $('achados-form');
       findingFormNodes = [...findingsForm.childNodes];
       findingControls = element('details',undefined,'desktop-finding-filters');
@@ -154,14 +158,12 @@
         item.button.setAttribute('aria-pressed',String(item.link.getAttribute('aria-current') === 'page'));
         item.link.replaceWith(item.button);item.link = null;
       }
-      if (body) {form.replaceChildren(...body.childNodes);body = null;toolbar = null;}
       if (findingSearchPosition) {
         const {button,parent,next}=findingSearchPosition;parent.insertBefore(button,next);
         findingSearchPosition=null;
       }
       if (findingFormNodes) $('achados-form').replaceChildren(...findingFormNodes);
       findingControls = null;findingFormNodes = null;
-      form.classList.remove('desktop-composer-closed');
       $('selecao-acervo').classList.remove('desktop-scope-ready');
       document.querySelector('.feedback-selection').classList.remove('desktop-no-selection');
       for (const item of savedDetails || []) {item.node.open = item.open;item.node.querySelector('summary').textContent = item.summary;}
@@ -170,8 +172,8 @@
       }
       metadata.clear();
       document.documentElement.style.removeProperty('--mesa-header-height');
-      document.documentElement.style.removeProperty('--mesa-composer-height');
     }
+    composerState();geometry();
   }
   const originalArea = showArea;
   showArea = name => {originalArea(name);navigationState();geometry();};
@@ -188,6 +190,7 @@
   new MutationObserver(feedbackState).observe($('observacoes-contagem'),{childList:true});
   $('codex-pergunta').addEventListener('input',() => {if (body) renderComposer();});
   desktop.addEventListener('change',activate);
+  buildComposer();
   activate();
 })();
 
