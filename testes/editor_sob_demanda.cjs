@@ -8,8 +8,12 @@ const path = require('node:path');
 const {criarMesa, PILHA, Evento} = require('./dom_minimo.cjs');
 
 const ALFA = {id: 'alfa', titulo: 'Pauta Alfa', rodadas: []};
-const NOTAS = {caso: 'alfa', revisao: 1, notas: [{id: 'n1', titulo: 'Nota um', texto: 'Texto **salvo**', fontes: []}]};
-const api = operacao => ({'apuracao-listar': NOTAS, inventario: {caso_id: 'alfa', corpus_id: 'c1', documentos: [], total_documentos: 0}}[operacao] || {});
+const NOTA = {id: 'n1', titulo: 'Nota um', texto: 'Texto **salvo**', fontes: [], revisao: 1, criado_em_utc: '2026-11-01T10:00:00+00:00'};
+const api = operacao => ({
+  'apuracao-notas': {caso: 'alfa', revisao_caderno: 1, notas: [{id: 'n1', titulo: 'Nota um', revisao: 1, fontes: 0, autor: null,
+    atualizado_em_utc: NOTA.criado_em_utc, criado_em_utc: NOTA.criado_em_utc}]},
+  'apuracao-nota': {caso: 'alfa', revisao_caderno: 1, nota: NOTA, fontes: []},
+  inventario: {caso_id: 'alfa', corpus_id: 'c1', documentos: [], total_documentos: 0}}[operacao] || {});
 const vditorScripts = mesa => mesa.doc.head.querySelectorAll('script').filter(s => s.src.startsWith('/vendor/vditor/'));
 
 async function abrirCaderno(opcoes = {}) {

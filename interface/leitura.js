@@ -54,6 +54,12 @@ window.Leitura = (() => {
   }
   // One label for the action that opens the original, wherever it appears.
   const rotuloOriginal = page => page ? `Ver página ${page} no original` : 'Abrir original';
+  // Author of a human record: the pilot account signs it; otherwise the name was typed by the user.
+  const CONTA = new Set(['humana_autenticada_pela_conta_da_mesa', 'conta_autenticada_da_mesa']);
+  function autoria(nome, origem) {
+    const t = (texto, vars) => window.I18N ? window.I18N.t(texto, vars) : texto.replace('{nome}', vars?.nome ?? '').replace('{origem}', vars?.origem ?? '');
+    return t('Autor: {nome} · {origem}', {nome, origem:t(CONTA.has(origem) ? 'autenticado pela conta da Mesa' : 'declarado pelo usuário')});
+  }
   function tecnicos(...content) {
     const details = node('details', undefined, 'technical');
     details.append(node('summary', 'Detalhes técnicos'));
@@ -168,5 +174,5 @@ window.Leitura = (() => {
     }
     target.replaceChildren(fragment);
   }
-  return {nome, fonte, localizador, pagina, rotuloOriginal, tecnicos, lacunas, markdown, quantidade};
+  return {nome, fonte, localizador, pagina, rotuloOriginal, autoria, tecnicos, lacunas, markdown, quantidade};
 })();

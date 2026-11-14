@@ -1,137 +1,441 @@
 'use strict';
+// Caderno: notes (left), editor with autosave (center), sources of the open note (right).
+// Each note has its own revision; autosave sends one request at a time, resends a request lost
+// to the network with the same requisicao_id, and stops on a conflict without overwriting.
 (() => {
-  let state=null, noteId=null, dirty=false, busy=false, pending=null, sequence=0, saveAttempt=null, dialogSequence=0;
-  const dialog=$('apuracao-adicionar-dialogo');
+  const PAUSE = 1500, FIRST_RETRY = 2000, LAST_RETRY = 30000;
+  const t = (text, vars) => window.I18N ? window.I18N.t(text, vars) : text;
+  const uid = () => crypto.randomUUID().replaceAll('-', '');
+  const dialog = $('apuracao-adicionar-dialogo');
+  const SAVE_TEXT = {pendente:'Alterações não salvas', salvando:'Salvando…', rede:'Não foi possível salvar. Tentando novamente…',
+    conflito:'Conflito: a nota foi alterada em outra aba', titulo:'Dê um título à nota para salvar', erro:'Alterações não salvas'};
+  let caseId = '', notes = [], current = null, sources = [], loading = false, sequence = 0, noteSequence = 0;
+  let dirty = false, edits = 0, timer = null, retryTimer = null, retryDelay = FIRST_RETRY;
+  let inflight = null, retryPayload = null, conflict = false, copied = false, saveState = {kind:'', at:null};
+  let creating = false, createRequest = null, pendingInsert = null, inserting = false, dialogSequence = 0, highlightTimer = null;
+
   // If editor_notas.js itself failed to load, the Markdown field still edits and saves.
-  function plainEditor(onInput){
-    $('apuracao-texto').addEventListener('input',onInput);
-    $('apuracao-vditor').hidden=true;$('apuracao-texto-alternativo').hidden=false;
-    $('apuracao-editor-aviso').textContent='O editor visual não carregou. Você pode editar e salvar o Markdown abaixo.';
-    $('apuracao-editor-aviso').hidden=false;
-    return {open(text){$('apuracao-texto').value=text;},flush(){},disabled(){}};
+  function plainEditor(onInput) {
+    $('apuracao-texto').addEventListener('input', onInput);
+    $('apuracao-vditor').hidden = true; $('apuracao-texto-alternativo').hidden = false;
+    $('apuracao-editor-aviso').textContent = 'O editor visual não carregou. Você pode editar e salvar o Markdown abaixo.';
+    $('apuracao-editor-aviso').hidden = false;
+    return {open(text) { $('apuracao-texto').value = text; }, flush() {}, disabled() {}};
   }
-  const editor=window.EditorNotas?new window.EditorNotas(changed):plainEditor(changed);
-  const uid=()=>crypto.randomUUID().replaceAll('-','');
-  function error(message=''){$('apuracao-erro').textContent=message;$('apuracao-erro').hidden=!message;}
-  function dialogError(message=''){$('apuracao-adicionar-erro').textContent=message;$('apuracao-adicionar-erro').hidden=!message;}
-  function discard(){return !dirty||window.confirm(window.I18N.t('Há alterações não salvas. Descartar essas alterações?'));}
-  function controls(){
-    const ready=!!state&&!busy;
-    $('apuracao-caso').disabled=busy;
-    $('apuracao-nova').disabled=!ready;
-    $('apuracao-atualizar').disabled=busy;
-    $('apuracao-exportar').disabled=!ready||dirty||!state.notas.length;
-    for(const control of $('apuracao-form').elements)control.disabled=busy;
-    editor.disabled(busy);
-    $('apuracao-excluir').disabled=busy||!noteId;
-    for(const button of $('apuracao-notas').querySelectorAll('button'))button.disabled=busy;
+  const editor = window.EditorNotas ? new window.EditorNotas(changed) : plainEditor(changed);
+
+  const locale = () => (window.I18N?.idioma?.() === 'en' ? 'en' : 'pt-BR');
+  const clock = iso => new Date(iso).toLocaleTimeString(locale(), {hour:'2-digit', minute:'2-digit'});
+  function updated(iso) {
+    if (!iso) return '';
+    const date = new Date(iso);
+    return date.toDateString() === new Date().toDateString() ? t('Atualizada às {hora}', {hora:clock(iso)})
+      : t('Atualizada em {data}', {data:date.toLocaleDateString(locale())});
   }
-  function preview(){Leitura.markdown($('apuracao-previa'),$('apuracao-texto').value);}
-  function changed(){dirty=true;preview();controls();$('apuracao-status').textContent='Alterações não salvas.';}
-  function sources(note){
-    const target=$('apuracao-fontes');target.replaceChildren();
-    if(!note?.fontes.length){target.append(element('p','Sem fonte anexada. Nota própria.','small'));return;}
-    for(const [number,source]of note.fontes.entries()){
-      const block=element('section',undefined,'notebook-source');
-      block.append(element('h4',`Fonte ${number+1} · ${source.tipo==='ia'?'Seleção de achado da IA':'Pesquisa documental'}`),
-        element('p',`${source.caso} / ${source.rodada}${source.achado_id?' / '+source.achado_id+' v'+source.achado_versao:''}`,'small'),element('blockquote',source.texto_selecionado));
-      if(!source.documentos.length)block.append(element('p','Achado sem evidência documental vinculada.','small'));
-      for(const [index,doc]of source.documentos.entries()){
-        const button=element('button',Leitura.rotuloOriginal(Leitura.pagina(doc)),'secondary');button.type='button';
-        block.append(element('p',`${doc.nome_documento} (${doc.documento_id}) · ${doc.pagina_pdf?'página PDF '+doc.pagina_pdf+' · ':''}${doc.localizador}`));
-        button.addEventListener('click',async()=>{button.disabled=true;try{await window.abrirOriginal(await api('apuracao-original',{caso:state.caso,nota_id:note.id,fonte_id:source.id,documento_indice:index},true),doc.nome_documento,doc.pagina_pdf);}catch(failure){error(failure.message);}finally{button.disabled=false;}});
-        block.append(button);
-      }
-      target.append(block);
+  const sourceCount = count => count === 1 ? t('1 fonte') : t('{n} fontes', {n:count});
+  function error(message = '') { $('apuracao-erro').textContent = message; $('apuracao-erro').hidden = !message; }
+  function dialogError(message = '') { $('apuracao-adicionar-erro').textContent = message; $('apuracao-adicionar-erro').hidden = !message; }
+  function indicator(kind, at = null) { saveState = {kind, at}; renderIndicator(); }
+  function renderIndicator() {
+    const target = $('apuracao-salvamento');
+    target.dataset.estado = saveState.kind;
+    target.textContent = saveState.kind === 'salvo' ? t('Salvo às {hora}', {hora:clock(saveState.at)})
+      : saveState.kind ? t(SAVE_TEXT[saveState.kind]) : '';
+  }
+  function controls() {
+    const ready = !!caseId && !loading;
+    $('apuracao-caso').disabled = loading;
+    $('apuracao-nova').disabled = !ready || creating;
+    $('apuracao-inserir').disabled = !ready;
+    $('apuracao-atualizar').disabled = loading;
+    $('apuracao-exportar').disabled = !ready || !notes.length;
+    $('apuracao-excluir').disabled = !current || loading;
+  }
+
+  // Left column: lightweight summaries, most recent first.
+  function summary(note) {
+    return {id:note.id, titulo:note.titulo, atualizado_em_utc:note.atualizado_em_utc || note.criado_em_utc, criado_em_utc:note.criado_em_utc,
+      revisao:note.revisao || 0, fontes:(note.fontes || []).length, autor:(note.atualizado_por || note.criado_por || {}).nome || null};
+  }
+  function remember(note) {
+    notes = [summary(note), ...notes.filter(item => item.id !== note.id)]
+      .sort((a, b) => String(b.atualizado_em_utc).localeCompare(String(a.atualizado_em_utc)));
+    renderList();
+  }
+  function renderList() {
+    $('apuracao-notas').replaceChildren(...notes.map(note => {
+      const item = element('li'), button = element('button', undefined, 'note-item');
+      button.type = 'button'; button.dataset.nota = note.id;
+      button.setAttribute('aria-current', String(note.id === current?.id));
+      const title = element('span', note.titulo, 'note-item-title'); title.setAttribute('translate', 'no');
+      button.append(title, element('span', [updated(note.atualizado_em_utc), sourceCount(note.fontes)].filter(Boolean).join(' · '), 'note-item-meta'));
+      if (note.autor) button.append(element('span', t('Autor: {nome}', {nome:note.autor}), 'note-item-author'));
+      button.addEventListener('click', () => openNote(note.id));
+      item.append(button);
+      return item;
+    }));
+    $('apuracao-notas-vazio').hidden = !caseId || loading || notes.length > 0;
+    $('apuracao-notas').closest('.notebook-workspace').classList.toggle('is-empty', !current);
+  }
+
+  // Right column: sources resolved by the server, with the original one click away.
+  function sourceDocument(doc) {
+    const block = element('div', undefined, 'note-source-doc');
+    const name = element('p', Leitura.nome(doc), 'note-source-doc-name'); name.setAttribute('translate', 'no');
+    const where = [doc.pagina_pdf ? t('Página PDF {n}', {n:doc.pagina_pdf}) : '', t(doc.localizador || '')].filter(Boolean).join(' · ');
+    const button = element('button', t(Leitura.rotuloOriginal(Leitura.pagina(doc))), 'secondary');
+    button.type = 'button';
+    block.append(name, element('p', where, 'small'), button);
+    if (!doc.disponivel) {
+      button.disabled = true;
+      const reason = element('p', t('Original indisponível (apuração na lixeira ou arquivo ausente)'), 'small');
+      reason.id = `apuracao-indisponivel-${doc.abrir?.fonte_id}-${doc.indice}`;
+      button.setAttribute('aria-describedby', reason.id);
+      block.append(reason);
+      return block;
+    }
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        const {operacao, ...scope} = doc.abrir;
+        await window.abrirOriginal(await api('apuracao-original', scope, true), doc.nome_documento, doc.pagina_pdf);
+      } catch (failure) { error(failure.message); }
+      finally { button.disabled = false; }
+    });
+    return block;
+  }
+  function renderSources() {
+    const target = $('apuracao-fontes');
+    if (!sources.length) { target.replaceChildren(element('p', t('Esta nota ainda não tem fontes. Use Inserir trecho com fonte.'), 'small')); return; }
+    target.replaceChildren(...sources.map(source => {
+      const card = element('article', undefined, 'note-source');
+      card.id = 'apuracao-fonte-' + source.numero; card.tabIndex = -1;
+      const marker = element('span', source.marcador, 'note-source-marker'); marker.setAttribute('translate', 'no');
+      const heading = element('h4'); heading.append(marker, ' · ', t(source.tipo === 'ia' ? 'Achado da IA' : 'Pesquisa documental'));
+      const details = [t('Rodada {rodada}', {rodada:source.rodada}), source.adicionada_por ? t('Adicionada por {nome}', {nome:source.adicionada_por}) : ''];
+      card.append(heading, element('blockquote', source.texto_selecionado), element('p', details.filter(Boolean).join(' · '), 'small'));
+      if (!source.documentos.length) card.append(element('p', t('Achado sem evidência documental vinculada.'), 'small'));
+      for (const doc of source.documentos) card.append(sourceDocument(doc));
+      return card;
+    }));
+  }
+  function highlight(number) {
+    const card = $('apuracao-fonte-' + number);
+    if (!card) return;
+    for (const other of $('apuracao-fontes').querySelectorAll('.note-source')) other.classList.remove('is-highlighted');
+    card.classList.add('is-highlighted');
+    card.scrollIntoView({block:'nearest', behavior:'smooth'});
+    clearTimeout(highlightTimer);
+    highlightTimer = setTimeout(() => card.classList.remove('is-highlighted'), 2500);
+  }
+  function markerAt(text, position) {
+    for (const match of String(text).matchAll(/\[Fonte (\d+)\]/g)) {
+      if (position >= match.index && position <= match.index + match[0].length) return Number(match[1]);
+    }
+    return null;
+  }
+  // The preview turns each [Fonte n] into a button that shows that source.
+  function preview() {
+    const target = $('apuracao-previa');
+    Leitura.markdown(target, $('apuracao-texto').value);
+    const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT), found = [];
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) if (/\[Fonte \d+\]/.test(node.data)) found.push(node);
+    for (const node of found) {
+      node.replaceWith(...node.data.split(/(\[Fonte \d+\])/).filter(Boolean).map(part => {
+        const match = /^\[Fonte (\d+)\]$/.exec(part);
+        if (!match) return part;
+        const chip = element('button', part, 'source-citation'); chip.type = 'button';
+        chip.addEventListener('click', () => highlight(Number(match[1])));
+        return chip;
+      }));
     }
   }
-  function open(identifier){
-    noteId=identifier;const note=state?.notas.find(n=>n.id===identifier);
-    $('apuracao-editor').hidden=false;$('apuracao-nota-titulo').value=note?.titulo||'';$('apuracao-texto').value=note?.texto||'';
-    editor.open(note?.texto||'');
-    dirty=false;preview();sources(note);renderList();controls();
+  function authorship(note) {
+    const who = note?.atualizado_por || note?.criado_por;
+    $('apuracao-autoria').textContent = who?.nome ? Leitura.autoria(who.nome, who.origem) : '';
+    $('apuracao-autoria').hidden = !who?.nome;
   }
-  function renderList(){
-    $('apuracao-notas').replaceChildren();
-    for(const note of state?.notas||[]){const button=element('button',note.titulo,'secondary');button.type='button';button.dataset.nota=note.id;button.setAttribute('aria-current',String(note.id===noteId));button.addEventListener('click',()=>{if(discard())open(note.id);});$('apuracao-notas').append(button);}
+
+  function stopTimers() { clearTimeout(timer); timer = null; clearTimeout(retryTimer); retryTimer = null; }
+  function showNote(note, resolved) {
+    stopTimers();
+    current = {id:note.id, revisao:note.revisao || 0, nota:note};
+    sources = resolved || [];
+    dirty = false; edits = 0; conflict = false; copied = false; retryPayload = null; retryDelay = FIRST_RETRY;
+    $('apuracao-conflito').hidden = true; $('apuracao-conflito-status').textContent = '';
+    $('apuracao-editor').hidden = false; $('apuracao-fontes-painel').hidden = false;
+    $('apuracao-nota-titulo').value = note.titulo; $('apuracao-texto').value = note.texto;
+    editor.open(note.texto);
+    authorship(note); preview(); renderSources(); renderList(); controls();
+    indicator('');
   }
-  function apply(result,selected=noteId){
-    state=result;dirty=false;renderList();
-    if(selected&&state.notas.some(n=>n.id===selected))open(selected);
-    else if(state.notas.length)open(state.notas[0].id);
-    else{noteId=null;$('apuracao-editor').hidden=true;}
-    controls();$('apuracao-status').textContent=`${state.notas.length} nota(s) salva(s) · revisão ${state.revisao}.`;
+  function clearEditor() {
+    stopTimers();
+    current = null; sources = []; dirty = false; conflict = false; retryPayload = null;
+    $('apuracao-editor').hidden = true; $('apuracao-fontes-painel').hidden = true; $('apuracao-conflito').hidden = true;
+    indicator(''); renderList(); controls();
   }
-  async function load(caseId){
-    const ticket=++sequence;busy=true;controls();error();
-    try{const result=caseId?await api('apuracao-listar',{caso:caseId}):null;if(ticket!==sequence)return;
-      if(result)apply(result);else{state=null;noteId=null;dirty=false;renderList();$('apuracao-editor').hidden=true;$('apuracao-status').textContent='Selecione uma apuração.';}}
-    catch(failure){if(ticket===sequence){error(failure.message);state=null;renderList();$('apuracao-editor').hidden=true;}}
-    finally{if(ticket===sequence){busy=false;controls();}}
+  function showConflict() {
+    conflict = true; copied = false; stopTimers();
+    indicator('conflito');
+    $('apuracao-conflito').hidden = false; $('apuracao-conflito-texto').hidden = true;
+    $('apuracao-conflito-status').textContent = '';
   }
-  async function catalog(){
-    if(busy||dirty)return;
-    try{const response=await fetch('/api/catalogo'),data=await response.json();if(!response.ok)throw new Error(data.erro||'Falha ao listar apurações.');
-      const selected=window.contextoCaso?.() ?? ($('apuracao-caso').value||$('caso').value||$('codex-caso')?.value||'');
-      $('apuracao-caso').replaceChildren(new Option('Selecione uma apuração',''),...data.casos.map(c=>new Option(c.titulo,c.id)));
-      if(data.casos.some(c=>c.id===selected))$('apuracao-caso').value=selected;
+
+  function schedule() { clearTimeout(timer); timer = setTimeout(() => { timer = null; save(); }, PAUSE); }
+  function changed() {
+    if (!current) return;
+    dirty = true; edits++; preview();
+    if (conflict) { indicator('conflito'); return; }
+    if (inflight || retryPayload) return;  // the running save reschedules when it ends
+    indicator('pendente'); schedule();
+  }
+  function save() {
+    clearTimeout(timer); timer = null;
+    if (inflight) return inflight;
+    if (!current || conflict) return Promise.resolve();
+    let payload = retryPayload;
+    if (!payload) {
+      if (!dirty) return Promise.resolve();
+      editor.flush();
+      const titulo = $('apuracao-nota-titulo').value;
+      if (!titulo.trim()) { indicator('titulo'); return Promise.resolve(); }
+      payload = {edits, body:{caso:caseId, requisicao_id:uid(), titulo, texto:$('apuracao-texto').value,
+        nota_id:current.id, revisao_nota:current.revisao}};
+    }
+    clearTimeout(retryTimer); retryTimer = null;
+    const noteId = current.id;
+    indicator('salvando');
+    inflight = (async () => {
+      try {
+        const result = await api('apuracao-nota-salvar', payload.body);
+        retryPayload = null; retryDelay = FIRST_RETRY;
+        remember(result.nota);
+        if (current?.id !== noteId) return;
+        current.revisao = result.nota.revisao; current.nota = result.nota;
+        authorship(result.nota); error();
+        if (edits === payload.edits) { dirty = false; indicator('salvo', result.salvo_em_utc); }
+        else { indicator('pendente'); schedule(); }
+      } catch (failure) {
+        if (current?.id !== noteId) return;
+        if (failure.result?.codigo === 'conflito') { retryPayload = null; showConflict(); }
+        else if (!failure.result) {
+          // No answer: resend the very same request, so a save that did land is not applied twice.
+          retryPayload = payload; indicator('rede');
+          retryTimer = setTimeout(() => { retryTimer = null; save(); }, retryDelay);
+          retryDelay = Math.min(retryDelay * 2, LAST_RETRY);
+        } else { retryPayload = null; indicator('erro'); error(failure.message); }
+      } finally { inflight = null; }
+    })();
+    return inflight;
+  }
+  // Save now (switching notes, exporting, inserting). True when nothing is left unsaved.
+  async function flush() {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (inflight) { await inflight; continue; }
+      if (conflict || !current || (!dirty && !retryPayload)) break;
+      await save();
+      if (retryPayload || saveState.kind === 'titulo' || saveState.kind === 'erro') break;
+    }
+    return !dirty && !retryPayload && !conflict;
+  }
+  const discard = () => window.confirm(t('Há alterações não salvas. Descartar essas alterações?'));
+
+  async function openNote(id, {force = false} = {}) {
+    if (!force && current?.id === id) return;
+    if (!force && !(await flush()) && dirty && !discard()) return;
+    const ticket = ++noteSequence, captured = caseId;
+    loading = true; controls(); error();
+    try {
+      const result = await api('apuracao-nota', {caso:captured, nota_id:id});
+      if (ticket !== noteSequence || captured !== caseId) return;
+      loading = false;
+      showNote(result.nota, result.fontes);
+      remember(result.nota);
+    } catch (failure) { if (ticket === noteSequence) error(failure.message); }
+    finally { if (ticket === noteSequence) { loading = false; controls(); } }
+  }
+  async function load(selected, preferred = current?.id) {
+    const ticket = ++sequence;
+    caseId = selected || ''; notes = []; loading = true; clearEditor(); error();
+    if (!caseId) { loading = false; renderList(); controls(); $('apuracao-status').textContent = ''; return; }
+    try {
+      const result = await api('apuracao-notas', {caso:caseId});
+      if (ticket !== sequence) return;
+      notes = result.notas; loading = false; renderList();
+      const target = notes.some(note => note.id === preferred) ? preferred : notes[0]?.id;
+      if (target) await openNote(target, {force:true});
+    } catch (failure) { if (ticket === sequence) { error(failure.message); notes = []; } }
+    finally { if (ticket === sequence) { loading = false; renderList(); controls(); } }
+  }
+  async function catalog() {
+    if (dirty || inflight) return;
+    try {
+      const response = await fetch('/api/catalogo'), data = await response.json();
+      if (!response.ok) throw new Error(data.erro || 'Falha ao listar apurações.');
+      const selected = window.contextoCaso?.() ?? ($('apuracao-caso').value || $('caso').value || '');
+      $('apuracao-caso').replaceChildren(new Option('Selecione uma apuração', ''), ...data.casos.map(c => new Option(c.titulo, c.id)));
+      if (data.casos.some(c => c.id === selected)) $('apuracao-caso').value = selected;
       await load($('apuracao-caso').value);
-    }catch(failure){error(failure.message);}
+    } catch (failure) { error(failure.message); }
   }
-  $('apuracao-caso').addEventListener('change',()=>{if(!discard()){$('apuracao-caso').value=state?.caso||'';return;}dirty=false;noteId=null;load($('apuracao-caso').value);});
-  $('apuracao-atualizar').addEventListener('click',()=>{if(discard()){dirty=false;catalog();}});
-  $('apuracao-nova').addEventListener('click',()=>{if(discard()){open(null);$('apuracao-nota-titulo').focus();}});
-  $('apuracao-nota-titulo').addEventListener('input',changed);
-  $('apuracao-form').addEventListener('submit',async event=>{
-    event.preventDefault();if(busy||!state)return;editor.flush();busy=true;controls();error();
-    const body={caso:state.caso,revisao:state.revisao,nota_id:noteId,titulo:$('apuracao-nota-titulo').value,texto:$('apuracao-texto').value};
-    const key=JSON.stringify(body);if(saveAttempt?.key!==key)saveAttempt={key,id:uid()};
-    try{const result=await api('apuracao-salvar',{...body,requisicao_id:saveAttempt.id});saveAttempt=null;apply(result,noteId||result.notas.at(-1).id);$('apuracao-status').textContent='Nota salva. Pode reabrir o caderno ou reiniciar o serviço.';}
-    catch(failure){error(failure.message);}finally{busy=false;controls();}
+
+  $('apuracao-caso').addEventListener('change', () => load($('apuracao-caso').value, null));
+  $('apuracao-atualizar').addEventListener('click', async () => { if ((await flush()) || !dirty || discard()) { dirty = false; catalog(); } });
+  $('apuracao-nota-titulo').addEventListener('input', changed);
+  $('apuracao-form').addEventListener('submit', event => { event.preventDefault(); flush(); });
+  $('apuracao-texto').addEventListener('click', () => {
+    const number = markerAt($('apuracao-texto').value, $('apuracao-texto').selectionStart);
+    if (number) highlight(number);
   });
-  $('apuracao-excluir').addEventListener('click',async()=>{
-    if(busy||!noteId||!window.confirm(window.I18N.t('Excluir esta nota do caderno? As fontes serão preservadas.')))return;
-    busy=true;controls();error();try{apply(await api('apuracao-excluir',{caso:state.caso,revisao:state.revisao,nota_id:noteId,requisicao_id:uid()}),null);}catch(failure){error(failure.message);}finally{busy=false;controls();}
+  $('apuracao-vditor').addEventListener('click', () => {
+    const selection = window.getSelection?.(), node = selection?.anchorNode;
+    const number = node?.nodeType === 3 ? markerAt(node.data, selection.anchorOffset) : null;
+    if (number) highlight(number);
   });
-  $('apuracao-exportar').addEventListener('click',async()=>{
-    if(busy||dirty||!state)return;busy=true;controls();error();const format=$('apuracao-formato').value;
-    try{download(await api('apuracao-exportar',{caso:state.caso,formato:format},true),`caderno_${state.caso}.${format}`);$('apuracao-status').textContent='Caderno salvo exportado com as referências de cada nota.';}
-    catch(failure){error(failure.message);}finally{busy=false;controls();}
+  $('apuracao-nova').addEventListener('click', async () => {
+    if (!caseId || creating) return;
+    if (!(await flush()) && dirty && !discard()) return;
+    // A lost answer is resent with the same id, so the note is not created twice.
+    if (createRequest?.caso !== caseId) createRequest = {caso:caseId, id:uid(), titulo:t('Nova nota')};
+    const request = createRequest;
+    creating = true; controls(); error(); indicator('salvando');
+    try {
+      const result = await api('apuracao-nota-salvar', {caso:request.caso, requisicao_id:request.id, titulo:request.titulo, texto:''});
+      createRequest = null;
+      if (request.caso !== caseId) return;
+      remember(result.nota); showNote(result.nota, []); indicator('salvo', result.salvo_em_utc);
+      $('apuracao-nota-titulo').focus(); $('apuracao-nota-titulo').select();
+    } catch (failure) {
+      if (failure.result) createRequest = null;
+      indicator(''); error(failure.message);
+    } finally { creating = false; controls(); }
   });
-  window.botaoAdicionarApuracao=(scope,container,fallback)=>{
-    const button=element('button','Inserir em nota','secondary');button.type='button';let selected='';
-    const selection=()=>{const value=window.getSelection();return value&&!value.isCollapsed&&container?.contains(value.anchorNode)&&container.contains(value.focusNode)?value.toString():fallback;};
+  $('apuracao-excluir').addEventListener('click', async () => {
+    if (!current || !window.confirm(t('Excluir esta nota do caderno? As fontes serão preservadas.'))) return;
+    await flush();
+    const target = current;
+    loading = true; controls(); error();
+    try {
+      await api('apuracao-nota-excluir', {caso:caseId, requisicao_id:uid(), nota_id:target.id, revisao_nota:target.revisao});
+      notes = notes.filter(note => note.id !== target.id);
+      clearEditor(); loading = false;
+      $('apuracao-status').textContent = t('Nota excluída. As fontes continuam preservadas.');
+      if (notes.length) await openNote(notes[0].id, {force:true});
+    } catch (failure) {
+      if (failure.result?.codigo === 'conflito') showConflict(); else error(failure.message);
+    } finally { loading = false; renderList(); controls(); }
+  });
+  $('apuracao-exportar').addEventListener('click', async () => {
+    if (!caseId) return;
+    if (!(await flush()) && dirty) { error(t('Salve a nota aberta antes de exportar.')); return; }
+    loading = true; controls(); error();
+    const format = $('apuracao-formato').value;
+    try {
+      download(await api('apuracao-exportar', {caso:caseId, formato:format}, true), `caderno_${caseId}.${format}`);
+      $('apuracao-status').textContent = t('Caderno exportado com as referências de cada nota.');
+    } catch (failure) { error(failure.message); }
+    finally { loading = false; controls(); }
+  });
+  $('apuracao-inserir').addEventListener('click', () => {
+    const panel = $('apuracao-inserir-ajuda'), open = panel.hidden;
+    panel.hidden = !open; $('apuracao-inserir').setAttribute('aria-expanded', String(open));
+  });
+  $('apuracao-ir-documentos').addEventListener('click', () => showArea('documentos'));
+  $('apuracao-ir-achados').addEventListener('click', () => showArea('achados'));
+  $('apuracao-copiar').addEventListener('click', async () => {
+    editor.flush();
+    const text = `${$('apuracao-nota-titulo').value}\n\n${$('apuracao-texto').value}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      $('apuracao-conflito-status').textContent = t('Texto copiado. Agora você pode recarregar a nota.');
+    } catch {
+      const area = $('apuracao-conflito-texto');
+      area.value = text; area.hidden = false; area.focus(); area.select();
+      $('apuracao-conflito-status').textContent = t('Não foi possível copiar automaticamente. Selecione o texto abaixo e copie.');
+    }
+    copied = true;
+  });
+  $('apuracao-recarregar').addEventListener('click', async () => {
+    if (!current) return;
+    if (!copied && !window.confirm(t('Recarregar descarta o texto deste editor. Continuar?'))) return;
+    await openNote(current.id, {force:true});
+  });
+
+  // "Inserir em nota" in search results and findings: choose the note, then insert with its revision.
+  function dialogControls() {
+    $('apuracao-adicionar-salvar').disabled = !pendingInsert || inserting;
+    $('apuracao-adicionar-fechar').disabled = inserting;
+  }
+  window.botaoAdicionarApuracao = (scope, container, fallback) => {
+    const button = element('button', 'Inserir em nota', 'secondary'); button.type = 'button'; let selected = '';
+    const selection = () => {
+      const value = window.getSelection();
+      return value && !value.isCollapsed && container?.contains(value.anchorNode) && container.contains(value.focusNode) ? value.toString() : fallback;
+    };
     // Capture before the button changes focus; keyboard activation also uses the current selection.
-    button.addEventListener('pointerdown',()=>{selected=selection();});
-    button.addEventListener('click',async event=>{
-      if(busy)return;const text=event.detail?selected||selection():selection();
-      const ticket=++dialogSequence;
-      selected='';dialogError();pending=null;$('apuracao-adicionar-salvar').disabled=true;
-      $('apuracao-adicionar-origem').textContent=`${scope.caso} / ${scope.rodada} · ${scope.tipo==='ia'?'Achado da IA':'Pesquisa documental'}`;$('apuracao-adicionar-texto').textContent=text;
+    button.addEventListener('pointerdown', () => { selected = selection(); });
+    button.addEventListener('click', async event => {
+      if (inserting) return;
+      const text = event.detail ? selected || selection() : selection(), ticket = ++dialogSequence;
+      selected = ''; dialogError(); pendingInsert = null; dialogControls();
+      $('apuracao-adicionar-origem').textContent = `${scope.caso} / ${scope.rodada} · ${scope.tipo === 'ia' ? 'Achado da IA' : 'Pesquisa documental'}`;
+      $('apuracao-adicionar-texto').textContent = text;
       dialog.showModal();
-      try{const saved=await api('apuracao-listar',{caso:scope.caso});if(!dialog.open||ticket!==dialogSequence)return;
-        pending={scope:{...scope,texto:text},state:saved,requisicao:uid()};$('apuracao-destino').replaceChildren(new Option('Criar nova nota',''),...saved.notas.map(n=>new Option(n.titulo,n.id)));
-        if(state?.caso===scope.caso&&noteId)$('apuracao-destino').value=noteId;
-        $('apuracao-adicionar-salvar').disabled=false;
-      }catch(failure){dialogError(failure.message);}
-    });return button;
+      try {
+        const saved = await api('apuracao-notas', {caso:scope.caso});
+        if (!dialog.open || ticket !== dialogSequence) return;
+        pendingInsert = {scope:{...scope, texto:text}, notes:saved.notas, key:null, request:null};
+        $('apuracao-destino').replaceChildren(new Option('Criar nova nota', ''), ...saved.notas.map(note => new Option(note.titulo, note.id)));
+        if (caseId === scope.caso && current) $('apuracao-destino').value = current.id;
+        dialogControls();
+      } catch (failure) { dialogError(failure.message); }
+    });
+    return button;
   };
-  $('apuracao-adicionar-fechar').addEventListener('click',()=>{if(!busy)dialog.close();});
-  dialog.addEventListener('close',()=>{++dialogSequence;pending=null;});
-  dialog.addEventListener('cancel',event=>{if(busy)event.preventDefault();});
-  $('apuracao-adicionar-form').addEventListener('submit',async event=>{
-    event.preventDefault();if(!pending||busy)return;
-    if(dirty){dialogError('Salve ou descarte a nota em edição na aba Apuração antes de adicionar a evidência.');return;}
-    busy=true;controls();$('apuracao-adicionar-salvar').disabled=true;$('apuracao-adicionar-fechar').disabled=true;dialogError();
-    const target=$('apuracao-destino').value;
-    try{const result=await api('apuracao-adicionar',{caso:pending.scope.caso,revisao:pending.state.revisao,nota_id:target||null,origem:pending.scope,requisicao_id:pending.requisicao});
-      const caseId=result.caso;dialog.close();if(![...$('apuracao-caso').options].some(o=>o.value===caseId))$('apuracao-caso').append(new Option(caseId,caseId));$('apuracao-caso').value=caseId;
-      apply(result,target||result.notas.at(-1).id);$('experiencia-status').textContent='Trecho inserido na nota com suas referências. Continue aqui ou abra o Caderno.';
-    }catch(failure){dialogError(failure.message);}finally{busy=false;controls();$('apuracao-adicionar-salvar').disabled=false;$('apuracao-adicionar-fechar').disabled=false;}
+  $('apuracao-adicionar-fechar').addEventListener('click', () => { if (!inserting) dialog.close(); });
+  dialog.addEventListener('close', () => { ++dialogSequence; pendingInsert = null; });
+  dialog.addEventListener('cancel', event => { if (inserting) event.preventDefault(); });
+  $('apuracao-adicionar-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const captured = pendingInsert;
+    if (!captured || inserting) return;
+    const target = $('apuracao-destino').value;
+    const open = !!target && caseId === captured.scope.caso && current?.id === target;
+    inserting = true; dialogControls(); dialogError();
+    try {
+      if (open && !(await flush())) throw new Error(t('Não foi possível salvar a nota aberta. Tente de novo antes de inserir o trecho.'));
+      const revision = open ? current.revisao : captured.notes.find(note => note.id === target)?.revisao;
+      const body = {caso:captured.scope.caso, origem:captured.scope, ...(target ? {nota_id:target, revisao_nota:revision} : {})};
+      const key = JSON.stringify(body);
+      if (captured.key !== key) { captured.key = key; captured.request = uid(); }
+      const result = await api('apuracao-nota-inserir', {...body, requisicao_id:captured.request});
+      inserting = false; dialog.close();
+      if (caseId === captured.scope.caso) { remember(result.nota); await openNote(result.nota_id, {force:true}); }
+      $('experiencia-status').textContent = t('Trecho inserido na nota com suas referências. Continue aqui ou abra o Caderno.');
+    } catch (failure) {
+      if (failure.result?.codigo === 'conflito') {
+        if (open) showConflict();
+        dialogError(t('A nota mudou em outra aba. Confira o destino e insira de novo.'));
+        try { captured.notes = (await api('apuracao-notas', {caso:captured.scope.caso})).notas; } catch { /* keep the list shown */ }
+      } else dialogError(failure.message);
+    } finally { inserting = false; dialogControls(); }
   });
-  window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
-  window.addEventListener('apuracao-abrir',catalog);
-  window.addEventListener('acervo-alterado',()=>{if(!$('area-apuracao').hidden)catalog();});
-  window.prepararTrocaApuracao=()=>{if(busy){$('experiencia-status').textContent='Aguarde o salvamento da nota.';return false;}if(!discard())return false;dirty=false;return true;};
+
+  window.addEventListener('beforeunload', event => {
+    if (dirty || inflight || retryPayload) { save(); event.preventDefault(); event.returnValue = ''; }
+  });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && dirty && !conflict) save(); });
+  window.addEventListener('apuracao-abrir', catalog);
+  window.addEventListener('acervo-alterado', () => { if (!$('area-apuracao').hidden) catalog(); });
+  window.addEventListener('vlado-idioma', () => { renderList(); renderSources(); renderIndicator(); authorship(current?.nota); });
+  // Switching the investigation waits for a save that is running or about to run.
+  window.prepararTrocaApuracao = () => {
+    if (inflight || timer) {
+      save(); $('experiencia-status').textContent = t('Aguarde o salvamento da nota.'); return false;
+    }
+    if (dirty && !discard()) return false;
+    dirty = false; return true;
+  };
   controls();
 })();

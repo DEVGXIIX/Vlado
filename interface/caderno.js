@@ -2,6 +2,12 @@
 (() => {
   const dialog=$('caderno-dialogo'), chosen=new Map();
   let session=null, ready=false, saving=false, loading=false, offset=0, next=null, version=0, dialogVersion=0, catalogVersion=0, lastAuthor='';
+  // In the pilot the server signs records with the account name and ignores a typed author.
+  if(document.body.dataset.modo==='piloto'){
+    $('caderno-autor').required=false;$('caderno-autor').closest('label').hidden=true;
+    $('caderno-autoria-ajuda').textContent='A autoria vem da sua conta da Mesa. Registrar uma anotação não aprova conclusões da IA.';
+    $('caderno-descricao').textContent='Trechos, achados e cruzamentos de autoria humana, separados dos resultados da IA. Neste piloto, a autoria vem da conta da Mesa que salva.';
+  }
   function error(message=''){$('caderno-erro').textContent=message;$('caderno-erro').hidden=!message;}
   function formError(message=''){$('caderno-form-erro').textContent=message;$('caderno-form-erro').hidden=!message;}
   function counts(){
@@ -34,7 +40,7 @@
       const entry=item.registro,card=element('article',undefined,'panel notebook-entry');
       card.dataset.registro=entry.id;
       card.append(element('p',entry.tipo==='cruzamento'?'Cruzamento humano':entry.tipo==='achado'?'Achado humano':'Trecho selecionado pelo jornalista','eyebrow'),
-        element('h3',entry.titulo),element('p',`Autoria humana declarada: ${entry.autor}`,'notebook-author'),
+        element('h3',entry.titulo),element('p',Leitura.autoria(entry.autor,entry.origem_autoria),'notebook-author'),
         element('p',new Date(entry.criado_em_utc).toLocaleString('pt-BR'),'small'));
       if(entry.anotacao)card.append(element('p',entry.anotacao,'human-review-note'));
       for(const [index,source]of entry.fontes.entries()){
@@ -78,6 +84,7 @@
       offset=result.deslocamento;next=result.proximo_deslocamento;
       window.mostrarRegistrosCaderno($('caderno-resultados'),{caso_id:caseId,registros:result.resultados},true);
       $('caderno-status').textContent=result.total?`${Leitura.quantidade(result.total,'contribuição humana','contribuições humanas')} nesta pesquisa.`:'Nenhum registro humano nesta pesquisa. Adicione um trecho ou achado.';
+      if(result.origem_autoria==='mista')$('caderno-status').textContent+=' '+window.I18N.t('Autoria mista: parte autenticada pela conta da Mesa, parte declarada pelo usuário.');
       $('caderno-intervalo').textContent=result.total?`${start+1}–${start+result.resultados.length} de ${result.total}`:'0 registros';
       $('caderno-anterior').disabled=!offset;$('caderno-proximo').disabled=next===null;
       window.registrarPaginaMesa?.('caderno', offset);

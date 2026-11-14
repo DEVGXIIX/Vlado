@@ -113,22 +113,30 @@
       </div><p id="diligencias-status" role="status" aria-live="polite">Selecione uma apuração.</p><p id="diligencias-erro" role="alert" hidden></p><div id="diligencias-resultados"></div>
     </section>
     <section id="area-apuracao" aria-labelledby="apuracao-titulo" hidden>
-      <div class="panel"><h2 id="apuracao-titulo">Caderno editável</h2><p>Combine suas notas e seleções de fontes. Salve as alterações antes de exportar. A inclusão de uma evidência não aprova a resposta da IA.</p>
-        <div class="filters"><label>Apuração selecionada<select id="apuracao-caso"><option value="">Selecione uma apuração</option></select></label><button id="apuracao-atualizar" type="button" class="secondary">Reabrir notas salvas</button></div>
-        <div class="actions"><button id="apuracao-nova" type="button" disabled>Nova nota</button><label>Formato de exportação<select id="apuracao-formato"><option value="md">Markdown</option><option value="pdf">PDF</option><option value="docx">DOCX editável</option></select></label><button id="apuracao-exportar" type="button" class="secondary" disabled>Exportar caderno salvo</button></div>
+      <h2 id="apuracao-titulo" class="sr-only">Caderno editável</h2>
+      <div class="notebook-toolbar">
+        <div class="actions"><button id="apuracao-nova" type="button" disabled>Nova nota</button><button id="apuracao-inserir" type="button" class="secondary" aria-expanded="false" aria-controls="apuracao-inserir-ajuda" disabled>Inserir trecho com fonte</button><label>Formato de exportação<select id="apuracao-formato"><option value="md">Markdown</option><option value="pdf">PDF</option><option value="docx">DOCX editável</option></select></label><button id="apuracao-exportar" type="button" class="secondary" disabled>Exportar</button><button id="apuracao-atualizar" type="button" class="secondary">Reabrir notas salvas</button></div>
+        <p id="apuracao-salvamento" class="save-state" role="status" aria-live="polite"></p>
       </div>
-      <p id="apuracao-status" role="status" aria-live="polite">Selecione uma apuração.</p><p id="apuracao-erro" role="alert" hidden></p>
-      <div class="notebook-workspace"><nav id="apuracao-notas" aria-label="Notas salvas"></nav>
-        <section id="apuracao-editor" class="panel" hidden><form id="apuracao-form">
+      <div class="filters"><label>Apuração selecionada<select id="apuracao-caso"><option value="">Selecione uma apuração</option></select></label></div>
+      <div id="apuracao-inserir-ajuda" class="notice notebook-insert-help" hidden><p>Selecione um trecho em Pesquisar documentos ou em Achados da IA e use Inserir em nota. O trecho entra na nota aberta com a fonte.</p><div class="actions"><button id="apuracao-ir-documentos" type="button" class="secondary">Pesquisar documentos</button><button id="apuracao-ir-achados" type="button" class="secondary">Achados da IA</button></div></div>
+      <p class="small notebook-note">As notas são salvas enquanto você escreve. Inserir um trecho com fonte não aprova a resposta da IA.</p>
+      <p id="apuracao-status" class="small" role="status" aria-live="polite"></p><p id="apuracao-erro" role="alert" hidden></p>
+      <div id="apuracao-conflito" class="notice notebook-conflict" role="alert" hidden><p>Conflito: a nota foi alterada em outra aba. Nada foi sobrescrito e o salvamento automático parou. Copie seu texto e depois recarregue a nota.</p><div class="actions"><button id="apuracao-copiar" type="button">Copiar meu texto</button><button id="apuracao-recarregar" type="button" class="secondary">Recarregar nota</button></div><p id="apuracao-conflito-status" class="small" role="status" aria-live="polite"></p><textarea id="apuracao-conflito-texto" rows="6" readonly hidden aria-label="Seu texto para copiar"></textarea></div>
+      <div class="notebook-workspace notebook-grid is-empty">
+        <nav class="notebook-notes" aria-labelledby="apuracao-notas-titulo"><h3 id="apuracao-notas-titulo">Notas</h3><ul id="apuracao-notas"></ul><p id="apuracao-notas-vazio" class="small" hidden>Nenhuma nota ainda. Use Nova nota.</p></nav>
+        <section id="apuracao-editor" class="panel" aria-label="Nota aberta" hidden><form id="apuracao-form">
           <label>Título da nota<input id="apuracao-nota-titulo" maxlength="200" required></label>
+          <p id="apuracao-autoria" class="small" hidden></p>
           <span id="apuracao-texto-rotulo">Texto da nota</span>
-          <p id="apuracao-editor-ajuda" class="small">Escreva com formatação visual. Use “Alternar modo de edição” na barra para renderização instantânea ou Markdown. Salve para guardar suas alterações.</p>
+          <p id="apuracao-editor-ajuda" class="small">Escreva com formatação visual ou troque para Markdown na barra. Clique em [Fonte n] para ver a fonte.</p>
           <p id="apuracao-editor-aviso" class="small" role="status" hidden></p>
           <button id="apuracao-editor-tentar" type="button" class="secondary" hidden>Tentar carregar o editor de novo</button>
           <div id="apuracao-vditor" aria-labelledby="apuracao-texto-rotulo" aria-describedby="apuracao-editor-ajuda"></div>
           <label id="apuracao-texto-alternativo" hidden>Texto em Markdown<textarea id="apuracao-texto" rows="16" maxlength="200000"></textarea></label>
-          <div class="actions"><button id="apuracao-salvar">Salvar nota</button><button id="apuracao-excluir" type="button" class="secondary">Excluir nota</button></div>
-        </form><h3>Pré-visualização</h3><div id="apuracao-previa" class="markdown-body"></div><h3>Fontes preservadas desta nota</h3><div id="apuracao-fontes"></div></section>
+          <div class="actions"><button id="apuracao-excluir" type="button" class="danger">Excluir nota</button></div>
+        </form><h3>Pré-visualização</h3><div id="apuracao-previa" class="markdown-body"></div></section>
+        <aside id="apuracao-fontes-painel" class="notebook-sources" aria-labelledby="apuracao-fontes-titulo" hidden><h3 id="apuracao-fontes-titulo">Fontes da nota</h3><div id="apuracao-fontes"></div></aside>
       </div>
     </section>
     <dialog id="apuracao-adicionar-dialogo" class="human-review-dialog" aria-labelledby="apuracao-adicionar-titulo">
@@ -137,7 +145,7 @@
       <form id="apuracao-adicionar-form"><label>Nota de destino<select id="apuracao-destino"><option value="">Criar nova nota</option></select></label><button id="apuracao-adicionar-salvar">Adicionar seleção</button></form><p id="apuracao-adicionar-erro" role="alert" hidden></p>
     </dialog>
     <section id="area-caderno" aria-labelledby="caderno-titulo" hidden>
-      <div class="panel"><h2 id="caderno-titulo">Contribuições do jornalista</h2><p>Trechos, achados e cruzamentos de autoria humana, separados dos resultados da IA. A autoria é declarada por quem salva; não há autenticação individual nesta versão.</p>
+      <div class="panel"><h2 id="caderno-titulo">Contribuições do jornalista</h2><p id="caderno-descricao">Trechos, achados e cruzamentos de autoria humana, separados dos resultados da IA. A autoria é declarada por quem salva; não há autenticação individual nesta versão.</p>
       <div class="filters"><label>Apuração<select id="caderno-caso"><option value="">Selecione uma apuração</option></select></label><button id="caderno-atualizar" type="button" class="secondary">Atualizar</button></div>
       <div class="actions"><button id="caderno-novo" type="button" disabled>Registrar trecho com fonte</button></div>
       <form id="caderno-pesquisa"><label>Pesquisar por trecho, anotação ou autoria<input id="caderno-texto" type="search" maxlength="500"></label><button id="caderno-buscar" disabled>Pesquisar no caderno</button></form>
@@ -328,7 +336,7 @@
       <div class="section-heading"><h2 id="caderno-dialogo-titulo">Registrar trecho com fonte</h2><button id="caderno-fechar" type="button" class="secondary">Fechar</button></div>
       <p id="caderno-escopo" class="small"></p><p id="caderno-form-erro" role="alert" hidden></p>
       <form id="caderno-form"><section id="caderno-fonte-form"><label>Documento<select id="caderno-documento" required></select></label><div class="actions"><button id="caderno-original" type="button" class="secondary">Abrir original</button><button id="caderno-fontes-atualizar" type="button" class="secondary">Atualizar documentos</button></div><label id="caderno-pagina-label">Página física do PDF<input id="caderno-pagina" type="number" min="1" step="1"></label><label>Localização no original<input id="caderno-localizador" maxlength="260" placeholder="Linhas, célula, tabela ou região observável; em PDF, detalhe opcional."></label><label>Trecho ou transcrição<textarea id="caderno-trecho" rows="5" maxlength="12000" required></textarea></label><label class="feedback-choice"><input id="caderno-manual" type="checkbox"><span>Conferi o original e registro uma transcrição manual caso o extrator não localize este trecho.</span></label><label>Tipo de contribuição<select id="caderno-tipo"><option value="trecho">Trecho selecionado pelo jornalista</option><option value="achado">Achado registrado pelo jornalista</option></select></label></section>
-      <div id="caderno-cruzamento-fontes" hidden></div><label>Título<input id="caderno-titulo-input" maxlength="200" required></label><label>Anotação ou interpretação humana<textarea id="caderno-anotacao" rows="4" maxlength="5000"></textarea></label><label>Autoria<input id="caderno-autor" maxlength="120" autocomplete="name" required placeholder="Nome de quem registra esta contribuição"></label><p class="small">O nome identifica a autoria informada, sem autenticação individual. Registrar uma anotação não aprova conclusões da IA.</p><button id="caderno-salvar">Registrar trecho com fonte</button><p id="caderno-form-status" role="status" aria-live="polite"></p></form>
+      <div id="caderno-cruzamento-fontes" hidden></div><label>Título<input id="caderno-titulo-input" maxlength="200" required></label><label>Anotação ou interpretação humana<textarea id="caderno-anotacao" rows="4" maxlength="5000"></textarea></label><label>Autoria<input id="caderno-autor" maxlength="120" autocomplete="name" required placeholder="Nome de quem registra esta contribuição"></label><p id="caderno-autoria-ajuda" class="small">O nome identifica a autoria informada, sem autenticação individual. Registrar uma anotação não aprova conclusões da IA.</p><button id="caderno-salvar">Registrar trecho com fonte</button><p id="caderno-form-status" role="status" aria-live="polite"></p></form>
     </dialog>
     <dialog id="continuidade-dialogo" class="human-review-dialog" aria-labelledby="continuidade-titulo">
       <div class="section-heading"><h2 id="continuidade-titulo">Continuar com novos documentos</h2><button id="continuidade-fechar" type="button" class="secondary">Fechar</button></div>
