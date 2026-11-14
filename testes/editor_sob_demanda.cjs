@@ -14,6 +14,7 @@ const api = operacao => ({
     atualizado_em_utc: NOTA.criado_em_utc, criado_em_utc: NOTA.criado_em_utc}]},
   'apuracao-nota': {caso: 'alfa', revisao_caderno: 1, nota: NOTA, fontes: []},
   inventario: {caso_id: 'alfa', corpus_id: 'c1', documentos: [], total_documentos: 0}}[operacao] || {});
+const VERSAO = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'interface', 'vendor', 'vditor', 'manifesto.json'), 'utf8')).version;
 const vditorScripts = mesa => mesa.doc.head.querySelectorAll('script').filter(s => s.src.startsWith('/vendor/vditor/'));
 
 async function abrirCaderno(opcoes = {}) {
@@ -40,10 +41,14 @@ test('outras áreas não pedem o editor; o caderno pede e mostra o carregamento'
   assert.equal(vditorScripts(codex).length, 0);
   const mesa = await abrirCaderno();
   assert.deepEqual(mesa.erros, []);
-  assert.deepEqual(vditorScripts(mesa).map(s => s.src), ['/vendor/vditor/dist/index.min.js', '/vendor/vditor/dist/js/lute/lute.min.js',
-    '/vendor/vditor/dist/js/i18n/pt_BR.js', '/vendor/vditor/dist/js/icons/ant.js']);
-  assert.equal(mesa.doc.head.querySelectorAll('link').filter(l => l.href === '/vendor/vditor/dist/index.css').length, 1);
-  assert.equal(mesa.$('vditorLuteScript').src, '/vendor/vditor/dist/js/lute/lute.min.js', 'ids reconhecidos pelo próprio Vditor');
+  // Every file carries the Vditor version, so the server can cache it as immutable.
+  const v = `?v=${VERSAO}`;
+  assert.deepEqual(vditorScripts(mesa).map(s => s.src), [`/vendor/vditor/dist/index.min.js${v}`, `/vendor/vditor/dist/js/lute/lute.min.js${v}`,
+    `/vendor/vditor/dist/js/i18n/pt_BR.js${v}`, `/vendor/vditor/dist/js/icons/ant.js${v}`]);
+  assert.deepEqual(mesa.doc.head.querySelectorAll('link').filter(l => l.href.startsWith('/vendor/')).map(l => l.href),
+    [`/vendor/vditor/dist/index.css${v}`, `/vendor/vditor/dist/css/content-theme/light.css${v}`]);
+  assert.equal(mesa.$('vditorLuteScript').src, `/vendor/vditor/dist/js/lute/lute.min.js${v}`, 'ids reconhecidos pelo próprio Vditor');
+  assert.equal(mesa.$('vditorContentTheme').href, `/vendor/vditor/dist/css/content-theme/light.css${v}`);
   assert.equal(mesa.$('apuracao-editor-aviso').hidden, false);
   assert.equal(mesa.$('apuracao-editor-aviso').textContent, 'Carregando o editor de notas…');
   vditorFalso(mesa.janela);
@@ -51,6 +56,8 @@ test('outras áreas não pedem o editor; o caderno pede e mostra o carregamento'
   await mesa.esperar(8);
   assert.equal(mesa.janela.criados.length, 1);
   assert.equal(mesa.janela.criados[0].opcoes.value, 'Texto **salvo**');
+  // Vditor would add the content theme without the version; the page already loaded it.
+  assert.deepEqual(JSON.parse(JSON.stringify(mesa.janela.criados[0].opcoes.preview.theme)), {current: '', path: ''});
   assert.equal(mesa.$('apuracao-editor-aviso').hidden, true);
   assert.equal(mesa.$('apuracao-texto-alternativo').hidden, true);
 });

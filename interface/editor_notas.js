@@ -3,19 +3,25 @@
 // first opens; every other area loads without it. Ids match the ones Vditor checks
 // before adding its own copies of Lute and the icon sprite.
 window.CarregadorVditor = (() => {
+  // Same as vendor/vditor/manifesto.json (a test keeps them equal). Versioned URLs let the
+  // server cache these files as immutable; a new Vditor version means new URLs.
+  const VERSAO = '4.0.1';
   const base = '/vendor/vditor/dist';
-  const sheet = base + '/index.css';
-  const scripts = [[base + '/index.min.js'], [base + '/js/lute/lute.min.js', 'vditorLuteScript'],
-    [base + '/js/i18n/pt_BR.js'], [base + '/js/icons/ant.js', 'vditorIconScript']];
+  const versioned = file => `${base}${file}?v=${VERSAO}`;
+  // The content theme carries Vditor's own id, so Vditor does not add an unversioned copy.
+  const sheets = [[versioned('/index.css')], [versioned('/css/content-theme/light.css'), 'vditorContentTheme']];
+  const scripts = [[versioned('/index.min.js')], [versioned('/js/lute/lute.min.js'), 'vditorLuteScript'],
+    [versioned('/js/i18n/pt_BR.js')], [versioned('/js/icons/ant.js'), 'vditorIconScript']];
   const requests = new Map();
   let pending = null;
   const ready = () => Boolean(window.Vditor && window.Lute && window.VditorI18n);
-  function addSheet() {
-    if (document.querySelector(`link[href="${sheet}"]`)) return;
+  function addSheet([href, id]) {
+    if (document.querySelector(`link[href="${href}"]`)) return;
     const link = document.createElement('link');
-    link.rel = 'stylesheet'; link.href = sheet;
+    link.rel = 'stylesheet'; link.href = href;
+    if (id) link.id = id;
     // Keep the application's stylesheet last, as when both were static.
-    const app = document.querySelector('link[href="/style.css"]');
+    const app = document.querySelector('link[href^="/style.css"]');
     if (app) app.before(link); else document.head.append(link);
   }
   function addScript([src, id]) {
@@ -37,7 +43,7 @@ window.CarregadorVditor = (() => {
   function load() {
     if (ready()) return Promise.resolve();
     if (!pending) {
-      addSheet();
+      sheets.forEach(addSheet);
       pending = Promise.all(scripts.map(request))
         .then(() => { if (!ready()) throw new Error('Arquivos do editor indisponíveis.'); })
         .finally(() => { pending = null; });
@@ -104,6 +110,8 @@ window.EditorNotas=class {
         link:{isOpen:false},image:{isPreview:false},hint:{parse:false},
         preview:{
           delay:150,actions:[],mode:'both',hljs:{enable:false},
+          // The versioned content theme is already on the page; an empty theme stops Vditor adding its own.
+          theme:{current:'',path:''},
           markdown:{sanitize:true,autoSpace:false,fixTermTypo:false,codeBlockPreview:false,mathBlockPreview:false,inlineMath:false},
           render:{media:{enable:false}},
           // Display diagram/formula code literally, without optional renderers or services.
