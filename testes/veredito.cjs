@@ -49,12 +49,13 @@ const luminancia = hex => { const n = parseInt(hex.slice(1, 7), 16); return 0.21
 const contraste = (a, b) => { const [x, y] = [luminancia(a), luminancia(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
 
 function temas() {
-  const escuro = Object.fromEntries([...css.match(/:root\[data-theme=dark\]\{([^}]*)\}/)[1].matchAll(/--(theme-[\w-]+):(#[0-9a-f]{6})/gi)].map(m => [m[1], m[2]]));
-  const raiz = css.match(/\/\* Approved visual direction[^\n]*\n:root\{([^}]*)\}/)[1];
-  const apelidos = Object.fromEntries([...raiz.matchAll(/--([\w-]+):var\(--(theme-[\w-]+),(#[0-9a-f]{6})\)/gi)].map(m => [m[1], {tema: m[2], claro: m[3]}]));
-  const claro = {...Object.fromEntries(Object.values(apelidos).map(a => [a.tema, a.claro])),
-    'theme-on-primary': '#ffffff', 'theme-active': '#f0f3e8', 'theme-danger': '#87342c', 'theme-danger-bg': '#f8e9e5'};
-  const resolver = (tabela, nome) => tabela[apelidos[nome]?.tema || nome];
+  // One token block per theme at the top of the style sheet; short names alias theme tokens.
+  const bloco = seletor => Object.fromEntries([...css.match(seletor)[1].matchAll(/--([\w-]+):([^;]+)/g)].map(m => [m[1], m[2].trim()]));
+  const claro = bloco(/:root\{([^}]*)\}/), escuro = {...claro, ...bloco(/:root\[data-theme=dark\]\{([^}]*)\}/)};
+  const resolver = (tabela, nome) => {
+    const apelido = /^var\(--([\w-]+)\)$/.exec(tabela[nome] || '');
+    return apelido ? tabela[apelido[1]] : tabela[nome];
+  };
   return {claro: nome => resolver(claro, nome), escuro: nome => resolver(escuro, nome)};
 }
 

@@ -10,7 +10,9 @@
     const label = theme === 'dark' ? 'Modo claro' : 'Modo escuro';
     button.textContent = label;
     button.setAttribute('aria-label', `Ativar ${label.toLowerCase()}`);
-    meta.content = theme === 'dark' ? '#171d1a' : '#f6f5f0';
+    // The browser chrome follows the page background token of the applied theme.
+    const background = getComputedStyle(document.documentElement).getPropertyValue('--theme-background').trim();
+    if (background) meta.content = background;
   }
   let saved;
   try { saved = localStorage.getItem(key); } catch (_) { /* Storage may be blocked. */ }
