@@ -2,20 +2,29 @@
 (() => {
   const dialog = $('revisao-dialogo');
   let session = null, sequence = 0, saving = false, ready = false;
-  // "Checked in the original" waits until each cited original was opened in this page.
-  // A screen-side reminder only: the server does not record it.
+  // "Checked in the original" waits until each cited original was opened in this page. The server
+  // checks the same thing (in memory, per page session); keeping an existing mark needs no reopening.
   const openedOriginals = new Set();
   const evidenceKey = (scope, id) => [scope.caso, scope.rodada, scope.revisao, id].join('/');
   function guard() {
     const option = $('revisao-estado').querySelector('[value="conferida_no_original"]');
     const missing = session ? session.evidences.filter(e => !openedOriginals.has(evidenceKey(session.scope, e.id))).length : 0;
-    option.disabled = !session?.sourcesReady || missing > 0;
-    $('revisao-guarda').hidden = !session?.sourcesReady || !missing;
+    const kept = session?.mark.estado === 'conferida_no_original' && !session.refused;
+    option.disabled = !kept && (!session?.sourcesReady || missing > 0);
+    $('revisao-guarda').hidden = kept || !session?.sourcesReady || !missing;
     $('revisao-guarda').textContent = `Para marcar “Conferida no original”, abra o original de cada trecho citado (${missing === 1 ? 'falta 1' : `faltam ${missing}`}).`;
+  }
+  // Excerpts the server still counts as unopened stand out until their original is opened again.
+  function markPending(id, pending) {
+    const block = $('revisao-fontes').querySelector(`[data-evidencia="${id}"]`);
+    if (!block) return;
+    block.classList.toggle('review-evidence-pendente', pending);
+    block.querySelector('.review-pendente')?.remove();
+    if (pending) block.querySelector('h4').after(element('p', 'Abra este original antes de marcar “Conferida no original”.', 'review-pendente'));
   }
   window.registrarOriginalConferido = (scope, evidenceId) => {
     openedOriginals.add(evidenceKey(scope, evidenceId));
-    if (session) guard();
+    if (session) { markPending(evidenceId, false); guard(); }
   };
   function fail(message = '') {
     $('revisao-erro').textContent = message; $('revisao-erro').hidden = !message;
@@ -63,6 +72,7 @@
       if (!evidences.length) $('revisao-fontes').append(element('p', 'Este achado não tem trechos vinculados nesta revisão. Você pode registrar uma pendência, um ajuste ou suporte insuficiente.', 'notice'));
       const loaded = await Promise.allSettled(evidences.map(async evidence => {
         const block = element('article', undefined, 'review-evidence');
+        block.dataset.evidencia = evidence.id;
         const roles = claim.vinculos.filter(link => link.evidencia_id === evidence.id).map(link => pretty(link.papel));
         block.append(element('h4', Leitura.fonte({...evidence, ...evidence.localizador})),
           element('p', roles.join(' · '), 'small'),
@@ -127,7 +137,12 @@
       }
     } catch (error) {
       fail(error.message); $('revisao-situacao').textContent = 'A marcação não foi confirmada. Sua observação continua no formulário.';
-    } finally { saving = false; controls(); }
+      if (error.result?.codigo === 'conferencia_sem_original' && session === captured) {
+        captured.refused = true;
+        for (const id of error.result.faltam || []) { openedOriginals.delete(evidenceKey(captured.scope, id)); markPending(id, true); }
+        $('revisao-fontes').querySelector('.review-evidence-pendente')?.scrollIntoView({block:'nearest'});
+      }
+    } finally { saving = false; controls(); guard(); }
   });
   $('achados-marcacao').addEventListener('change', () => {
     $('achados-so-pendentes').setAttribute('aria-pressed', String($('achados-marcacao').value === 'pendente'));

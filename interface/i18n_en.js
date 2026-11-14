@@ -780,7 +780,8 @@ window.VLADO_I18N_EN = {
     "A autoria vem da sua conta da Mesa. Registrar uma anotação não aprova conclusões da IA.": "Authorship comes from your Mesa account. Saving a note does not approve the AI's conclusions.",
     "Trechos, achados e cruzamentos de autoria humana, separados dos resultados da IA. Neste piloto, a autoria vem da conta da Mesa que salva.": "Excerpts, findings and cross-checks written by people, kept apart from the AI's results. In this pilot, authorship comes from the Mesa account that saves them.",
     "Autoria mista: parte autenticada pela conta da Mesa, parte declarada pelo usuário.": "Mixed authorship: some authenticated by the Mesa account, some declared by the user.",
-    "No piloto, cada marcação leva o nome da conta da Mesa que a registrou.": "In the pilot, each mark carries the name of the Mesa account that recorded it."
+    "No piloto, cada marcação leva o nome da conta da Mesa que a registrou.": "In the pilot, each mark carries the name of the Mesa account that recorded it.",
+    "Abra este original antes de marcar “Conferida no original”.": "Open this original before marking “Checked against the original”."
   },
   padroes: [
     ["^Conectado à API · (.+) · (.+)$", "Connected to API · $1 · $2"],

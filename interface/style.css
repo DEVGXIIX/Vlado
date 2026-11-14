@@ -358,3 +358,6 @@ main:has(#area-achados:not([hidden])) .intro{margin-bottom:16px}
 @media(max-width:1190px){#area-apuracao .notebook-workspace.notebook-grid{grid-template-columns:minmax(170px,200px) minmax(0,1fr)}#area-apuracao .notebook-sources{grid-column:2;position:static;max-height:none}}
 @media(max-width:900px){#area-apuracao .notebook-workspace.notebook-grid{grid-template-columns:minmax(0,1fr);gap:16px}#area-apuracao .notebook-sources{grid-column:auto}#area-apuracao #apuracao-notas{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:4px}#apuracao-notas>li{flex:0 0 min(220px,70vw);scroll-snap-align:start}#apuracao-notas .note-item{height:100%;border:1px solid var(--line)}#area-apuracao #apuracao-editor{padding:18px}}
 @media(prefers-reduced-motion:reduce){.note-source{transition:none}}
+/* Excerpts the server still counts as unopened: dashed outline and a line of text, not color alone. */
+.review-evidence.review-evidence-pendente{padding:14px 16px;margin:6px 0;border:1px dashed var(--warning);border-radius:8px;background:var(--warning-bg)}
+.review-pendente{margin:0 0 8px;font-size:13px;font-weight:600;color:var(--warning)}
