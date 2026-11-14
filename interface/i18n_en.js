@@ -28,6 +28,8 @@ window.VLADO_I18N_EN = {
     "Trechos com fonte": "Sourced excerpts",
     "ESPAÇO DE TRABALHO": "WORKSPACE",
     "Apurações e lixeira": "Cases and trash",
+    "Comece sua primeira apuração": "Start your first investigation",
+    "Dê um nome à pauta e envie os arquivos. Cada um recebe um recibo, e você já pode perguntar à IA sobre eles.": "Name the story and upload the files. Each one gets a receipt, and you can ask the AI about them right away.",
     "Como começar": "Getting started",
     "Cadastre os arquivos e confira o recibo de cada envio.": "Register the files and check the receipt for each upload.",
     "Abra Perguntar à IA, confira a conexão com a API e escolha o caso.": "Open Ask the AI, check the API connection and choose the case.",

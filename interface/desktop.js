@@ -235,7 +235,16 @@
     else if(scopePanel.parentElement===$('mesa-pesquisa')){$('area-documentos').before(scopePanel);scopePanel.hidden=active()!=='achados';}
   }
   function chooseTab(value){$('documentos-aba').value=value;$('documentos-aba').dispatchEvent(new Event('change'));tab();}
+  // First run: with an empty catalog there is nothing to continue, only one first step.
+  function firstRun(){
+    const empty=catalogLoaded&&!cases.length;
+    $('mesa-continuar').hidden=empty;
+    text('mesa-primeiro-titulo',empty?'Comece sua primeira apuração':'Nova apuração');
+    text('mesa-primeiro-texto',empty?'Dê um nome à pauta e envie os arquivos. Cada um recebe um recibo, e você já pode perguntar à IA sobre eles.'
+      :'Cadastre os documentos da pauta, pergunte à IA e confira cada achado na página do original.');
+  }
   function home(){
+    firstRun();
     const target=$('mesa-retomada'),caseData=cases.find(c=>c.id===current());target.replaceChildren();
     if(!caseData){target.append(element('h3','Escolha sua próxima história.'),element('p','Selecione uma apuração no topo da mesa para retomar seu trabalho.'));return;}
     const info=element('div'),next=element('div',undefined,'mesa-resume-next');
