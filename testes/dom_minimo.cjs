@@ -412,7 +412,10 @@ function criarMesa({url = 'http://127.0.0.1:8765/', papel = 'admin', modo = 'loc
       try {
         const resposta = await api(operacao, dados);
         return {ok: true, blob: async () => resposta, json: async () => resposta};
-      } catch (erro) { return {ok: false, json: async () => ({erro: erro.message})}; }
+      } catch (erro) {
+        // Like the real server: an error body may carry a stable `codigo` besides `erro`.
+        return {ok: false, json: async () => (erro.result || {erro: erro.message})};
+      }
     },
   };
   janela.window = janela; janela.self = janela; janela.globalThis = janela;
