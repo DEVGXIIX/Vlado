@@ -88,6 +88,15 @@
       <p id="codex-erro" role="alert" hidden></p>
       <details id="codex-recibo-alerta" class="notice" hidden><summary>Recibo dos documentos enviados · confira as limitações antes de perguntar</summary></details>
       <button id="codex-reconectar" type="button" class="secondary" hidden>Reconectar acompanhamento</button>
+      <section id="codex-execucao" class="codex-run" aria-labelledby="codex-execucao-pergunta" hidden>
+        <div class="codex-run-head"><span id="codex-execucao-selo" class="run-badge"></span><h3 id="codex-execucao-pergunta" translate="no"></h3></div>
+        <p id="codex-execucao-mensagem"></p>
+        <p id="codex-execucao-causa" class="small" hidden></p>
+        <ol id="codex-execucao-etapas" class="codex-run-steps" aria-label="Etapas desta pergunta"></ol>
+        <p id="codex-execucao-aviso" class="small" role="status" aria-live="polite" hidden></p>
+        <div class="actions"><button id="codex-retomar" type="button" hidden>Tentar novamente</button></div>
+        <p id="codex-retomar-cota" class="small" hidden>A nova tentativa conta como uma pergunta da sua cota diária. Se o servidor recusar, a pergunta volta para a cota.</p>
+      </section>
       <section id="codex-limitacoes" class="notice source-limitations" aria-labelledby="codex-limitacoes-titulo" hidden><h3 id="codex-limitacoes-titulo">Limitações das fontes</h3><ul id="codex-limitacoes-lista"></ul></section>
       <div class="actions"><button id="codex-continuar-documentos" type="button" class="secondary" disabled>Continuar com novos documentos</button></div>
       <div class="codex-workspace">

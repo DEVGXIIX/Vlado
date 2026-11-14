@@ -290,3 +290,26 @@ main:has(#area-achados:not([hidden])) .intro{margin-bottom:16px}
 .delete-confirm strong{font-weight:700;overflow-wrap:anywhere}
 #apagar-erro{padding:12px 14px;margin:14px 0 0;background:var(--warning-bg);color:var(--warning);border-radius:6px;overflow-wrap:anywhere}
 @media(max-width:720px){.manage-actions{justify-content:flex-start}.delete-scope th,.delete-scope td{padding:7px 6px}}
+/* Run status of the selected conversation. State is carried by the badge text and the step marks, not by color. */
+.codex-run{margin:0 0 22px;padding:16px 20px;background:var(--white);border:1px solid var(--line);border-radius:10px}
+.codex-run-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 12px}
+.codex-run-head h3{flex:1 1 260px;min-width:0;margin:0;font:500 19px/1.4 "Source Serif 4",Georgia,serif;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.run-badge{flex-shrink:0;padding:2px 9px;border:1px solid transparent;border-radius:4px;font-size:12px;font-weight:600;line-height:1.5;color:var(--green);background:var(--soft)}
+.run-badge:is(.run-interrompido,.run-incompleto,.run-sem_cota){color:var(--warning);background:var(--warning-bg)}
+.run-badge.run-erro{color:var(--theme-danger,#974835);background:var(--theme-danger-bg,#f7ece5)}
+.run-badge.run-cancelado{color:var(--muted);background:transparent;border:1px dashed var(--muted)}
+#codex-execucao-mensagem{margin:10px 0 0;font-size:15px;max-width:75ch}
+#codex-execucao-causa{margin:4px 0 0;max-width:75ch}
+.codex-run-steps{display:flex;flex-wrap:wrap;gap:6px 8px;list-style:none;padding:0;margin:14px 0 0}
+.run-step{display:inline-flex;align-items:center;gap:7px;padding:3px 11px 3px 7px;border:1px solid var(--line);border-radius:999px;font-size:13px;line-height:1.5;color:var(--muted)}
+.run-step-mark{position:relative;width:14px;height:14px;flex-shrink:0;border:1.5px solid currentColor;border-radius:50%}
+.run-step[data-estado=aceita]{color:var(--ink);background:var(--soft);border-color:transparent}
+.run-step[data-estado=aceita] .run-step-mark{background:var(--green);border-color:var(--green)}
+.run-step[data-estado=aceita] .run-step-mark::after{content:'';position:absolute;left:3.5px;top:1px;width:3px;height:6.5px;border:solid var(--theme-on-primary,#fff);border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}
+.run-step[data-estado=proxima]{color:var(--green);border-color:var(--green);font-weight:600}
+.run-step[data-estado=proxima] .run-step-mark::after{content:'';position:absolute;inset:2.5px;border-radius:50%;background:currentColor}
+.run-step[data-estado=pendente]{border-style:dashed}
+#codex-execucao-aviso{margin:12px 0 0;font-size:14px;font-weight:600;color:var(--green)}
+.codex-run>.actions{margin:14px 0 0}
+#codex-retomar-cota{margin:8px 0 0;max-width:75ch}
+@media(max-width:720px){.codex-run{padding:14px 16px}.codex-run-head h3{font-size:17px}.run-step{font-size:12px}}

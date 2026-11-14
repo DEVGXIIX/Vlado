@@ -40,7 +40,8 @@
       element('span', ' · '), chat ? data(chat) : element('span', 'Nova conversa'));
   }
   // Composite progress lines mix a run state with a stage; both words are translated as they are written.
-  const t = text => window.I18N ? window.I18N.t(text) : text;
+  const t = (text, vars) => window.I18N ? window.I18N.t(text, vars)
+    : Object.entries(vars || {}).reduce((result, [name, value]) => result.split(`{${name}}`).join(String(value)), text);
   const stageLabels = {inventario:'Conferindo o acervo',plano:'Planejando',busca:'Buscando e lendo fontes',
     geracao_inicial:'Registrando a geração inicial',revisao:'Revisando o suporte',sintese:'Preparando a síntese',comparacao:'Comparando com a análise anterior'};
   const busyStates = new Set(['preparando','executando','aguardando_aprovacao','cancelando','publicando']);
@@ -50,12 +51,84 @@
     erro:'Execução com erro · confira a mensagem', pronto:'Pronto'};
   names.publicando = 'Publicando e verificando os achados';
   names.incompleto = 'Fluxo incompleto · saídas preservadas, publicação final não confirmada';
+  // Run status of the selected conversation: badge, the question's stages and "Tentar novamente".
+  const badges = {em_andamento:'Em execução', cancelando:'Cancelando…', concluido:'Concluída', cancelado:'Cancelada por você',
+    sem_cota:'Limite de uso atingido', interrompido:'Interrompida', erro:'Falhou', incompleto:'Incompleta'};
+  const stageNames = {inventario:'Inventário do acervo', plano:'Plano da apuração', busca:'Busca e leitura das fontes',
+    geracao_inicial:'Geração inicial dos achados', revisao:'Revisão do suporte', sintese:'Síntese',
+    comparacao:'Comparação com a análise anterior', publicacao:'Publicação'};
+  const stepStates = {aceita:'aceita', proxima:'próxima', pendente:'pendente'};
+  const guest = () => document.body?.dataset.papel === 'convidado';
+  let run = null, retrying = false, resumed = null;
+  // Conversations saved before `situacao` existed carry only `estado`.
+  function situation(record) {
+    if (record?.situacao?.codigo) return record.situacao;
+    const code = {concluido:'concluido', erro:'erro', interrompido:'interrompido', incompleto:'incompleto', cancelando:'cancelando'}[record?.estado]
+      || (busyStates.has(record?.estado) ? 'em_andamento' : null);
+    return code ? {codigo:code, mensagem:'', causa:null} : null;
+  }
+  function badge(record) {
+    const current = situation(record);
+    return current ? t(badges[current.codigo] || current.codigo) : t(names[record?.estado] || record?.estado || '');
+  }
+  function causeHint(current) {
+    if (current.causa === 'reinicio') return t('Causa: o servidor foi reiniciado.');
+    if (current.causa === 'contexto') return t('Abra uma nova conversa para continuar.');
+    if (current.causa === 'autenticacao') return guest() ? t('A API recusou a chave. Avise a administração.')
+      : t('Confira a chave da API em Conexão e opções antes de tentar de novo.');
+    if (current.codigo === 'sem_cota' && ['limite_consulta', 'limite_dia'].includes(current.causa)) {
+      return t('A nova tentativa pode ser recusada até o limite ser ajustado ou até o dia seguinte (UTC).');
+    }
+    return '';
+  }
+  const stageName = stage => t(stageNames[stage] || stage);
+  function resumeText(data) {
+    return data.etapa === 'publicacao' ? t('Retomada na publicação final.')
+      : t('Retomada da etapa {numero} de {total}: {etapa}.', {numero:data.numero, total:data.total, etapa:stageName(data.etapa)});
+  }
+  function runSteps(progress) {
+    const list = $('codex-execucao-etapas');
+    list.hidden = !progress?.etapas?.length;
+    list.replaceChildren(...(progress?.etapas || []).map(stage => {
+      const status = progress.aceitas.includes(stage) ? 'aceita' : stage === progress.proxima ? 'proxima' : 'pendente';
+      const item = element('li', undefined, 'run-step');
+      item.dataset.estado = status;
+      const mark = element('span', undefined, 'run-step-mark'); mark.setAttribute('aria-hidden', 'true');
+      item.append(mark, element('span', stageName(stage), 'run-step-name'), element('span', ` (${t(stepStates[status])})`, 'sr-only'));
+      return item;
+    }));
+  }
+  function runBlock() {
+    const current = conversation ? situation(run) : null;
+    $('codex-execucao').hidden = !current || current.codigo === 'concluido';
+    if ($('codex-execucao').hidden) return;
+    $('codex-execucao-selo').textContent = t(badges[current.codigo] || current.codigo);
+    $('codex-execucao-selo').className = 'run-badge run-' + current.codigo;
+    const question = run.pergunta_atual || conversationList.find(c => c.id === conversation)?.pergunta;
+    $('codex-execucao-pergunta').textContent = question || t('Execução desta conversa');
+    $('codex-execucao-pergunta').setAttribute('translate', question ? 'no' : 'yes');
+    $('codex-execucao-mensagem').textContent = current.mensagem ? t(current.mensagem) : '';
+    $('codex-execucao-mensagem').hidden = !current.mensagem;
+    const hint = causeHint(current);
+    $('codex-execucao-causa').textContent = hint; $('codex-execucao-causa').hidden = !hint;
+    runSteps(run.progresso);
+    const running = ['em_andamento', 'cancelando'].includes(current.codigo);
+    $('codex-execucao-aviso').textContent = running && resumed ? resumeText(resumed) : '';
+    $('codex-execucao-aviso').hidden = !(running && resumed);
+    const idle = !active && !submitting && !trackingPending && !trackingFailed;
+    const button = $('codex-retomar'), next = run.progresso ? run.progresso.proxima : undefined;
+    button.hidden = run.retomavel !== true || current.causa === 'contexto' || !(idle || retrying);
+    button.disabled = retrying;
+    button.textContent = retrying ? t('Retomando…') : next === null ? t('Concluir publicação')
+      : next ? t('Tentar novamente a partir de «{etapa}»', {etapa:stageName(next)}) : t('Tentar novamente');
+    $('codex-retomar-cota').hidden = button.hidden || !guest();
+  }
   function fail(message = '') {
     $('codex-erro').textContent = message;
     $('codex-erro').hidden = !message;
   }
   function controls() {
-    const blocked = active || submitting || trackingPending;
+    const blocked = active || submitting || trackingPending || retrying;
     $('codex-enviar').disabled = blocked || trackingFailed || !$('codex-caso').value;
     $('codex-pergunta').disabled = submitting || !$('codex-caso').value;
     $('codex-cancelar').disabled = !conversation || !(active || trackingFailed || trackingPending);
@@ -73,6 +146,7 @@
     $('codex-caderno-retirar').disabled = blocked || trackingFailed;
     $('codex-diligencias-retirar').disabled = blocked || trackingFailed;
     destination();
+    runBlock();
   }
   function feedbackPreview() {
     $('codex-observacoes').hidden = !pendingFeedback;
@@ -133,6 +207,7 @@
     pendingDiligences = null; diligencePreview();
     ++view; conversation = ''; cursor = 0; active = false;
     trackingFailed = false; trackingPending = false;
+    run = null; resumed = null; retrying = false;
     switchDraft($('codex-caso').value, '');
     currentStage = '';
     currentGroup = null; currentRound = ''; groups.clear(); frozenInventories.clear();
@@ -189,7 +264,7 @@
     const selected = $('codex-conversa').value;
     $('codex-conversa').replaceChildren(new Option('Nova conversa', ''),
       ...conversationList.map(c => {
-        const option = new Option(`${c.titulo} · ${t(names[c.estado] || c.estado)}`, c.id);
+        const option = new Option(`${c.titulo} · ${badge(c)}`, c.id);
         option.dataset.titulo = c.titulo;
         return option;
       }));
@@ -390,6 +465,9 @@
     } else if (event.tipo === 'uso') {
       const tokens = (uso) => `entrada ${uso.entrada || 0}, saída ${uso.saida || 0}, cache ${uso.cache_leitura || 0}`;
       $('codex-atividades').append(element('li', `Uso da API${data.etapa ? ' · ' + data.etapa : ''}: ${tokens(data.uso || {})} tokens · total da análise: ${tokens(data.total || {})}`));
+    } else if (event.tipo === 'retomada') {
+      resumed = data;
+      $('codex-atividades').append(element('li', resumeText(data)));
     } else if (event.tipo === 'aviso') $('codex-atividades').append(element('li', data.mensagem));
   }
   function watch() {
@@ -409,6 +487,7 @@
         for (const [round, inventory] of Object.entries(data.acervos || {})) frozenInventories.set(round, inventory);
         for (const entry of data.eventos) event(entry, chatId);
         cursor = data.cursor;
+        run = data.conversa;
         state(data.conversa.estado);
         limitations();
         if (!active && data.eventos.length < 100) { await conversations(); return; }
@@ -424,6 +503,21 @@
     }
   }
   $('codex-reconectar').addEventListener('click', () => { if (trackingFailed) watch(); });
+  // Same frozen round, from the first stage not yet accepted. Guests send only the conversation.
+  $('codex-retomar').addEventListener('click', async () => {
+    if (retrying || active || submitting || trackingPending || trackingFailed || !conversation || run?.retomavel !== true) return;
+    const chatId = conversation;
+    retrying = true; fail(); controls();
+    try {
+      const result = await api('codex-retomar', {conversa:chatId});
+      if (chatId !== conversation) return;
+      run = {...run, retomavel:false, situacao:{codigo:'em_andamento', mensagem:'Em execução.', causa:null}};
+      resumed = null; retrying = false;
+      state(result.estado);
+      watch();
+    } catch (error) { if (chatId === conversation) fail(error.message); }
+    finally { retrying = false; controls(); }
+  });
   $('codex-conectar').addEventListener('click', status);
   $('codex-desligar').addEventListener('click', async () => {
     if (!window.confirm(window.I18N.t('Encerrar o serviço local? As execuções ativas serão interrompidas. As saídas já salvas serão preservadas; será necessário abrir a Mesa novamente para continuar.'))) return;
@@ -551,6 +645,7 @@
     }
     for (const record of messageMap.values()) messageText(record);
     conversationOptions();
+    runBlock();
   });
   controls();
 })();
