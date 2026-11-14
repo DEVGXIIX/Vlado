@@ -17,12 +17,34 @@ from inferencia_api import seguro
 from indice_achados import verificar
 
 
+def pdfs_sinteticos(root):
+    """Two Portuguese PDFs: native text with the fact on page 2, and an image-only scan (needs local OCR)."""
+    import pymupdf
+    ata = pymupdf.open()
+    ata.new_page().insert_text((72, 100), 'MATERIAL SINTETICO - TESTE TECNICO. Ata do grupo ficticio Aurora.', fontsize=11)
+    ata.new_page().insert_text((72, 100), 'Em 10 de janeiro de 2040, o grupo ficticio Aurora realizou uma reuniao.', fontsize=11)
+    ata.save(root / 'ata.pdf')
+    origem = pymupdf.open()
+    pagina = origem.new_page()
+    pagina.insert_text((72, 100), 'MATERIAL SINTETICO - TESTE TECNICO.', fontsize=14)
+    pagina.insert_text((72, 130), 'Em 15 de janeiro de 2040, o grupo ficticio Aurora', fontsize=14)
+    pagina.insert_text((72, 155), 'publicou um aviso sobre a reuniao.', fontsize=14)
+    imagem = pagina.get_pixmap(dpi=200)
+    aviso = pymupdf.open()
+    aviso.new_page(width=pagina.rect.width, height=pagina.rect.height).insert_image(pagina.rect, pixmap=imagem)
+    aviso.save(root / 'aviso_digitalizado.pdf')
+    return [root / 'ata.pdf', root / 'aviso_digitalizado.pdf']
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--saida-base', required=True)
     parser.add_argument('--complemento', action='store_true')
     parser.add_argument('--limite-tokens', type=int, default=None,
                         help='Teto de tokens (entrada+saída) desta consulta; a rodada para ao ultrapassar.')
+    parser.add_argument('--pdf', action='store_true',
+                        help='Corpus em PDF em português: um com texto nativo (fato na página 2) e um digitalizado (OCR local).')
+    parser.add_argument('--ingles', action='store_true', help='Faz a pergunta em inglês sobre o corpus em português.')
     args = parser.parse_args()
     base = Path(args.saida_base).resolve()
     if not base.is_relative_to(ROOT.resolve()):
@@ -46,8 +68,8 @@ def main():
         (root / 'ajustes').mkdir()
         shutil.copyfile(ROOT / 'ajustes/inferencia.json', root / 'ajustes/inferencia.json')
     os.environ.setdefault('VLADO_SEGREDOS', str(ROOT / 'segredos' / 'chaves.json'))
-    files = []
-    for name, content in [('ata.txt', 'MATERIAL SINTÉTICO — TESTE TÉCNICO.\nEm 10 de janeiro de 2040, o grupo fictício Aurora realizou uma reunião.\n'),
+    files = pdfs_sinteticos(root) if args.pdf else []
+    for name, content in [] if args.pdf else [('ata.txt', 'MATERIAL SINTÉTICO — TESTE TÉCNICO.\nEm 10 de janeiro de 2040, o grupo fictício Aurora realizou uma reunião.\n'),
                           ('aviso.txt', 'MATERIAL SINTÉTICO — TESTE TÉCNICO.\nEm 15 de janeiro de 2040, o grupo fictício Aurora publicou um aviso sobre a reunião.\n')]:
         path = root / name
         path.write_text(content, encoding='utf-8')
@@ -61,7 +83,10 @@ def main():
     try:
         if not manager.status()['autenticado']:
             raise ValueError('Login ChatGPT não disponível para o teste online.')
-        questions = ['Quais são os acontecimentos nos dois documentos sintéticos? Liste até dois, em ordem cronológica, com documento, localização e trecho de apoio.']
+        questions = (['What events do the two synthetic documents describe? List up to two, in chronological order, '
+                      'with the document, the PDF page and a supporting excerpt quoted in Portuguese. Answer in English.']
+                     if args.ingles else
+                     ['Quais são os acontecimentos nos dois documentos sintéticos? Liste até dois, em ordem cronológica, com documento, localização e trecho de apoio.'])
         if args.complemento:
             questions.append('Qual desses acontecimentos é o mais antigo? Reabra a fonte e cite o documento, a localização e o trecho.')
         for question in questions:

@@ -17,7 +17,13 @@
   - processo como usuário `vlado` (uid 10001), código sem permissão de escrita, pastas de dados graváveis; a imagem não contém chaves, ajustes, convites, casos, testes, `.venv` nem `.git`;
   - `HEALTHCHECK` chega a `healthy`, `/saude` responde `{"ok": true}` e a página sem convite responde 401; `docker compose config` válido.
 - **Conferida no original:** o servidor só aceita a marcação depois que a mesma sessão da página abriu, pela Mesa, o original de cada trecho citado naquela revisão (registro em memória; reiniciar o servidor pede para reabrir). É uma proteção do fluxo de trabalho, não prova de leitura: quem tem a sessão pode baixar o original sem lê-lo.
-- **Não verificado:** pergunta em inglês sobre PDF em português, os PDFs da Americanas, o provedor Anthropic com chave real, o Caddy com certificado real e a implantação num servidor.
+- **Ensaio real em inglês sobre PDFs em português** (`testes/qa_fluxo_real.py --pdf --ingles`, provedor OpenAI, modelo informado `gpt-6.1-sol`):
+  - corpus sintético com dois PDFs: uma ata com texto nativo e o fato na página 2, e um aviso só-imagem lido pelo OCR local (Tesseract, sem envio externo);
+  - a primeira execução concluiu 5 das 6 etapas e parou na síntese pelo teto de 500 mil tokens por consulta, com situação "sem cota" e o que estava pronto preservado;
+  - com o teto elevado, **Tentar novamente** retomou a mesma rodada `R001` direto na síntese, sem refazer etapas, e publicou `r3_sintese/g1` com 2 achados verificados;
+  - a síntese saiu em inglês, em ordem cronológica, citando documento e página física corretos (ata na página 2, aviso na página 1) e os trechos em português;
+  - uso total: 586.448 tokens de entrada (535.790 em cache) e 5.599 de saída; a retomada sozinha usou cerca de 75 mil de entrada e 484 de saída. Custo estimado pelo preço de tabela: cerca de US$ 0,25 no total (confirmar no painel do provedor). Não houve conferência humana.
+- **Não verificado:** os PDFs da Americanas, o provedor Anthropic com chave real, o Caddy com certificado real e a implantação num servidor.
 
 ## Registro anterior (1.3.0)
 
