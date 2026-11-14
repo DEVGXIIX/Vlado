@@ -45,7 +45,7 @@
   const stageLabels = {inventario:'Conferindo o acervo',plano:'Planejando',busca:'Buscando e lendo fontes',
     geracao_inicial:'Registrando a geração inicial',revisao:'Revisando o suporte',sintese:'Preparando a síntese',comparacao:'Comparando com a análise anterior'};
   const busyStates = new Set(['preparando','executando','aguardando_aprovacao','cancelando','publicando']);
-  const names = {preparando:'Preparando snapshot e índice', executando:'IA trabalhando',
+  const names = {preparando:'Preparando os documentos e a busca', executando:'IA trabalhando',
     aguardando_aprovacao:'Aguardando sua resposta', cancelando:'Cancelamento solicitado',
     concluido:'Execução concluída', interrompido:'Execução interrompida · saídas parciais preservadas',
     erro:'Execução com erro · confira a mensagem', pronto:'Pronto'};
@@ -424,7 +424,7 @@
       const content=element('div');window.mostrarRegistrosCaderno(content,data);details.append(content);owner.root.insertBefore(details,owner.answers);
     } else if (event.tipo === 'evolucao_corpus') {
       const owner=currentGroup||group(), details=element('details',undefined,'feedback-history');
-      details.append(element('summary','Documentos incorporados nesta rodada'));
+      details.append(element('summary','Documentos incorporados nesta análise'));
       const content=element('div');window.mostrarCorpusNovo(content,data);details.append(content);
       owner.root.insertBefore(details,owner.answers);
     } else if (event.tipo === 'comparativo') {
@@ -455,7 +455,7 @@
       $('codex-atividades').append(element('li', `${data.numero}/${data.total} · ${currentStage}${data.tentativa > 1 ? ' · nova tentativa automática' : ''}`));
     } else if (event.tipo === 'publicacao') {
       $('codex-atividades').append(element('li', `Achados publicados e verificados: ${data.caso} / ${data.rodada} · ${data.achados} achado(s). Conferência humana não realizada.`));
-      const link = element('button','Consultar achados desta rodada','secondary'); link.type = 'button';
+      const link = element('button','Consultar achados desta análise','secondary'); link.type = 'button';
       link.addEventListener('click', async () => {
         try {
           await window.abrirAchadosDaRodada(data);

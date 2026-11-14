@@ -120,17 +120,7 @@ body{font-size:var(--text-base);line-height:1.55}.app-header{padding-top:18px;pa
   .notebook-workspace:has(#apuracao-notas:empty){grid-template-columns:minmax(0,1fr)}
   .notebook-workspace:has(#apuracao-notas:empty) #apuracao-notas{display:none}
   dialog,.original-workspace,#original-conteudo,.review-context>.context{overscroll-behavior:contain}
-  #selecao-acervo.desktop-scope-ready{padding:14px 20px;margin-bottom:16px}
-  .desktop-scope-ready:not(:has(details[open])){display:flex;align-items:center;gap:20px}
-  .desktop-scope-ready:not(:has(details[open])) .section-heading{display:contents}
-  .desktop-scope-ready:not(:has(details[open])) .section-heading>div{max-width:240px}
-  .desktop-scope-ready:not(:has(details[open])) .section-heading>button{order:3;margin-left:auto;flex-shrink:0}
-  .desktop-scope-ready:not(:has(details[open])) #acervo-escolha{flex:1;min-width:0}
   main:has(#area-achados:not([hidden])){padding-top:20px}
-  .desktop-scope-ready .eyebrow,.desktop-scope-ready #contexto-rodada{display:none}
-  .desktop-scope-ready .section-heading{margin-bottom:0}
-  .desktop-scope-ready h2{font-size:var(--text-xl)}
-  .desktop-scope-ready summary{padding:8px 0;font-weight:400}
   #area-achados>.panel{padding:18px 20px}
   #area-achados>.panel>h2{font-size:var(--text-xl);margin-bottom:8px}
   #achados-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 18px}
@@ -177,7 +167,7 @@ html{scroll-padding-top:110px}body{background:var(--paper);color:var(--ink);font
 @media(min-width:1051px){.findings-list{max-height:calc(100dvh - 140px);overflow-y:auto;position:sticky;top:calc(var(--mesa-header-height,86px) + 20px);padding-right:5px;overscroll-behavior:contain;scrollbar-gutter:stable}.finding-inspector>button{display:none}}
 @media(max-width:720px){.sidebar{visibility:hidden}.mesa-menu-open .sidebar{visibility:visible}}
 @media(max-width:720px){.mesa-file-table td>.mesa-mobile-coverage{display:block;color:var(--warning);font-size:var(--text-xs)}}
-@media(min-width:1051px){main:has(#area-achados:not([hidden])){padding-top:28px}.desktop-scope-ready:not(:has(details[open])) .section-heading>div{max-width:230px}#area-achados .human-review-toolbar{padding:15px 18px;margin:8px 0 0}.desktop-finding-fields{padding:15px 0}#achados-form>.actions{align-items:center}#apuracao-texto{font-size:var(--text-base)}.notebook-workspace:has(#apuracao-notas:empty){grid-template-columns:1fr}.notebook-workspace:has(#apuracao-notas:empty) #apuracao-notas{display:none}}
+@media(min-width:1051px){main:has(#area-achados:not([hidden])){padding-top:28px}#area-achados .human-review-toolbar{padding:15px 18px;margin:8px 0 0}.desktop-finding-fields{padding:15px 0}#achados-form>.actions{align-items:center}#apuracao-texto{font-size:var(--text-base)}.notebook-workspace:has(#apuracao-notas:empty){grid-template-columns:1fr}.notebook-workspace:has(#apuracao-notas:empty) #apuracao-notas{display:none}}
 @media(min-width:1550px){:root{--mesa-sidebar:245px}main{padding:45px 55px}.app-header{padding-inline:55px}.codex-workspace{grid-template-columns:minmax(0,1fr) 340px}}
 @media(max-width:1190px){:root{--mesa-sidebar:205px}.sidebar{padding-inline:12px}.sidebar-brand{font-size:var(--text-brand)}.areas>a,.areas>button{font-size:var(--text-md)}.app-header{padding-inline:28px}main{padding:30px 28px}.codex-workspace{grid-template-columns:minmax(0,1fr) 240px;gap:20px}.findings-workspace{grid-template-columns:265px minmax(0,1fr)}.notebook-workspace{grid-template-columns:175px minmax(0,1fr)}.mesa-diligence-board{gap:13px}.mesa-diligence-column .diligence-entry{padding:16px}#mesa-etapas{gap:16px}.mesa-file-table th,.mesa-file-table td{padding-inline:13px}}
 @media(max-width:1050px){.codex-workspace{grid-template-columns:1fr}.codex-fontes{position:static;padding-top:20px;border-top:1px solid var(--line)}#codex-fontes{max-height:60vh}.findings-workspace{grid-template-columns:1fr}.findings-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.finding-choice:last-child:nth-child(odd){grid-column:auto}.mesa-diligence-board{grid-template-columns:1fr}.mesa-diligence-column .actions{flex-direction:row;flex-wrap:wrap}.mesa-diligence-column .actions button{width:auto}.mesa-file-table td:nth-child(2),.mesa-file-table th:nth-child(2){display:none}.mesa-file-table td:first-child{width:40%}.mesa-file-table td:nth-child(3){width:35%}}
@@ -374,6 +364,12 @@ main:has(#area-achados:not([hidden])) .intro{margin-bottom:16px}
 /* Excerpts the server still counts as unopened: dashed outline and a line of text, not color alone. */
 .review-evidence.review-evidence-pendente{padding:14px 16px;margin:6px 0;border:1px dashed var(--warning);border-radius:8px;background:var(--warning-bg)}
 .review-pendente{margin:0 0 8px;font-size:var(--text-sm);font-weight:600;color:var(--warning)}
+/* Achados: the chip names the selected analysis and folds the selectors away. */
+.versao-recolhida{display:none!important}
+.version-chip{display:inline-block;max-width:100%;min-height:36px;margin:2px 0 12px;padding:6px 14px;border-radius:999px;font-size:var(--text-sm);font-weight:500;line-height:1.5;text-align:left;color:var(--ink);overflow-wrap:anywhere}
+.version-chip .chip-action{color:var(--green);font-weight:600;text-decoration:underline;text-underline-offset:3px}
+.version-chip[aria-expanded=true]{background:var(--soft)}
+@media(pointer:coarse){.version-chip{min-height:44px}}
 /* Question composer: collapsible at every width. The toolbar stays; the fields fold away. */
 .desktop-composer-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px}
 .desktop-composer-toolbar .small{margin:0;min-width:0}

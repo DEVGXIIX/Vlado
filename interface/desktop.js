@@ -33,7 +33,6 @@
   const navigation = [...document.querySelectorAll('.areas button:not([hidden])')].map(button => ({button,id:button.id,link:null}));
   const metadata = new Map();
   let body = null, toolbar = null, toggle = null, caption = null, collapsed = false, hadAnswer = false;
-  let savedDetails = null;
   let findingControls = null, findingFormNodes = null;
   let findingSearchPosition = null;
   let appliedDesktop = null;
@@ -99,16 +98,9 @@
     renderComposer();
   }
   function compactFindings() {
+    // The version chip (app.js) folds the analysis selectors at every width.
     if (!desktop.matches || activeArea() !== 'achados' || !findingResult) return;
-    const analysis = $('rodada').selectedOptions[0]?.textContent || $('rodada').value;
-    const review = $('achados-revisao').selectedOptions[0]?.textContent || '';
-    const generation = $('achados-geracao').selectedOptions[0]?.textContent || '';
-    $('acervo-escolha').open = false;
-    $('acervo-escolha').querySelector('summary').textContent = `${analysis} · trocar análise`;
-    $('achados-versoes').open = false;
-    $('achados-versoes-resumo').textContent = `${review} · ${generation} · trocar versão`;
     if (findingControls) findingControls.open = false;
-    $('selecao-acervo').classList.add('desktop-scope-ready');
   }
   function feedbackState() {
     if (!desktop.matches) return;
@@ -119,7 +111,6 @@
     if (appliedDesktop === desktop.matches) return;
     appliedDesktop = desktop.matches;
     if (desktop.matches) {
-      savedDetails = [$('acervo-escolha'),$('achados-versoes')].map(node => ({node,open:node.open,summary:node.querySelector('summary').textContent}));
       for (const item of navigation) {
         const link = element('a',item.button.textContent);
         link.id = item.id;link.className = item.button.className;
@@ -164,9 +155,7 @@
       }
       if (findingFormNodes) $('achados-form').replaceChildren(...findingFormNodes);
       findingControls = null;findingFormNodes = null;
-      $('selecao-acervo').classList.remove('desktop-scope-ready');
       document.querySelector('.feedback-selection').classList.remove('desktop-no-selection');
-      for (const item of savedDetails || []) {item.node.open = item.open;item.node.querySelector('summary').textContent = item.summary;}
       for (const [field,attrs] of metadata) for (const [name,value] of Object.entries(attrs)) {
         if (value === null) field.removeAttribute(name);else field.setAttribute(name,value);
       }
@@ -179,12 +168,6 @@
   showArea = name => {originalArea(name);navigationState();geometry();};
   window.addEventListener('mesa-rota-alterada',navigationState);
   window.addEventListener('mesa-consulta',event => {if (event.detail.area === 'achados') compactFindings();});
-  for (const id of ['caso','rodada']) $(id).addEventListener('change',() => {
-    if (!desktop.matches) return;
-    $('selecao-acervo').classList.remove('desktop-scope-ready');
-    $('acervo-escolha').querySelector('summary').textContent = 'Escolher análise e conjunto de documentos';
-    $('acervo-escolha').open = true;
-  });
   new MutationObserver(composerState).observe($('codex-mensagens'),{childList:true,subtree:true});
   new MutationObserver(composerState).observe(form,{attributes:true,attributeFilter:['hidden'],subtree:true});
   new MutationObserver(feedbackState).observe($('observacoes-contagem'),{childList:true});
@@ -308,7 +291,7 @@
     text('mesa-acervo-status','Conferindo os documentos cadastrados…');text('mesa-versao','Conferindo acervo…');
     try{
       const result=await api('inventario',{caso:caseId});if(ticket!==sequence||caseId!==current())return;
-      inventory=result;documentTable();home();text('mesa-versao',result.corpus_id);text('mesa-acervo-status',`${Leitura.quantidade(result.total_documentos,'documento')} cadastrado(s). Os originais estão preservados; a extração não substitui a conferência.`);
+      inventory=result;documentTable();home();text('mesa-versao',`Versão dos documentos: ${result.corpus_id}`);text('mesa-acervo-status',`${Leitura.quantidade(result.total_documentos,'documento')} cadastrado(s). Os originais estão preservados; a extração não substitui a conferência.`);
     }catch(error){if(ticket===sequence){$('mesa-acervo-erro').textContent=error.message;$('mesa-acervo-erro').hidden=false;text('mesa-acervo-status','A conferência do acervo falhou. Isso não equivale a um acervo vazio.');text('mesa-versao','Acervo indisponível');}}
     finally{if(ticket===sequence){loading=false;$('mesa-atualizar-acervo').disabled=false;}}
   }

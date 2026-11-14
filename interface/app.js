@@ -49,9 +49,9 @@ async function loadCatalog() {
   reset();
   const version = epoch;
   options('caso', [], 'Carregando casos…');
-  options('rodada', [], 'Selecione uma rodada'); options('geracao', [], 'Selecione a versão');
+  options('rodada', [], 'Selecione uma análise'); options('geracao', [], 'Selecione a versão');
   updateScopeHeading();
-  empty('Selecione um caso para começar', 'A pesquisa usa o acervo congelado de uma rodada existente.');
+  empty('Selecione um caso para começar', 'A pesquisa usa os documentos preservados de uma análise existente.');
   try {
     const response = await fetch('/api/catalogo');
     const data = await response.json();
@@ -82,11 +82,11 @@ $('atualizar').addEventListener('click', loadCatalog);
 $('caso').addEventListener('change', () => {
   reset();
   const current = cases.find(c => c.id === $('caso').value);
-  options('rodada', (current?.rodadas || []).map(r => ({value:r.id, label:`Análise ${parseInt(r.id.slice(1), 10)} · documentos preservados (${r.id})`})), 'Selecione uma rodada');
+  options('rodada', (current?.rodadas || []).map(r => ({value:r.id, label:`Análise ${parseInt(r.id.slice(1), 10)} · documentos preservados (${r.id})`})), 'Selecione uma análise');
   options('geracao', [], 'Selecione a versão');
-  if (!current) empty('Selecione um caso para começar', 'A pesquisa usa o acervo congelado de uma rodada existente.');
-  else if (!current.rodadas.length) empty('Este caso ainda não tem rodadas', 'Abra Perguntar à IA e envie sua pergunta. Os documentos já cadastrados serão preservados nesta análise.');
-  else empty('Escolha uma rodada', 'Cada rodada mantém sua própria versão dos documentos e do índice.');
+  if (!current) empty('Selecione um caso para começar', 'A pesquisa usa os documentos preservados de uma análise existente.');
+  else if (!current.rodadas.length) empty('Esta apuração ainda não tem análises', 'Abra Perguntar à IA e envie sua pergunta. Os documentos já cadastrados serão preservados nesta análise.');
+  else empty('Escolha uma análise', 'Cada análise mantém sua própria versão dos documentos e da busca.');
   if (current) {
     const captured = epoch;
     api('analises',{caso:current.id}).then(result=>{
@@ -97,8 +97,9 @@ $('caso').addEventListener('change', () => {
         const date=analysis.data?new Date(analysis.data).toLocaleDateString('pt-BR'):'';
         option.textContent=analysis.pergunta?`${date} · ${analysis.pergunta.replace(/\s+/g,' ').slice(0,160)} (${analysis.id})`:`Análise ${analysis.id} · metadados indisponíveis`;
         option.dataset.descricao=analysis.pergunta?`${analysis.pergunta} · Documentos: ${analysis.documentos} · ${date}`:analysis.aviso;
+        option.dataset.dia=analysis.data?new Date(analysis.data).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'';
       }
-      updateScopeHeading();
+      updateScopeHeading();versionChip();
     }).catch(failure=>{if(captured===epoch)$('status').textContent=`Não foi possível carregar os títulos das análises: ${failure.message}`;});
   }
 });
@@ -107,15 +108,15 @@ $('rodada').addEventListener('change', () => {
   const current = cases.find(c => c.id === $('caso').value)?.rodadas.find(r => r.id === $('rodada').value);
   options('geracao', (current?.geracoes || []).map(g => ({value:g, label:`Versão ${g.replace(/^g/,'')} (${g})`})), 'Selecione a versão');
   $('busca-tecnica').open = Boolean(current);
-  empty(current && !current.geracoes.length ? 'Rodada sem índice disponível' : 'Escolha a versão do índice',
-    current && !current.geracoes.length ? 'Esta rodada precisa de construção explícita do índice. A tela não reconstrói nem sobrescreve índices.' : 'A cobertura será conferida antes da pesquisa.');
+  empty(current && !current.geracoes.length ? 'Análise sem busca disponível' : 'Escolha a versão da busca',
+    current && !current.geracoes.length ? 'A busca desta análise ainda não foi construída. A tela não a constrói nem sobrescreve.' : 'A cobertura será conferida antes da pesquisa.');
 });
 function updateScopeHeading() {
   const current = cases.find(c => c.id === $('caso').value);
   $('contexto-pauta').textContent = current?.titulo || 'Selecione uma apuração';
   $('contexto-rodada').textContent = current
     ? `${current.titulo} · ${$('rodada').value ? `Análise ${parseInt($('rodada').value.slice(1),10)} (${$('rodada').value})` : 'Nenhuma análise selecionada.'} · Versão da busca: ${$('geracao').value || 'não selecionada'}`
-    : 'Nenhuma rodada selecionada.';
+    : 'Nenhuma análise selecionada.';
   if($('rodada').selectedOptions[0]?.dataset.descricao)$('contexto-rodada').textContent+=' · '+$('rodada').selectedOptions[0].dataset.descricao;
 }
 for (const id of ['caso','rodada','geracao']) $(id).addEventListener('change', updateScopeHeading);
@@ -123,7 +124,7 @@ $('rodada').addEventListener('change', () => { if ($('rodada').value) $('acervo-
 $('geracao').addEventListener('change', async () => {
   reset();
   const version = epoch;
-  if (!$('geracao').value) { empty('Escolha a versão do índice', 'A cobertura será conferida antes da pesquisa.'); return; }
+  if (!$('geracao').value) { empty('Escolha a versão da busca', 'A cobertura será conferida antes da pesquisa.'); return; }
   $('busca-tecnica').open = true;
   $('status').textContent = 'Conferindo índice e cobertura…';
   try {
@@ -468,7 +469,7 @@ $('cadastro').addEventListener('submit', async event => {
     const pdf = result.extracao_pdf_resumo;
     $('cadastro-status').textContent = pdf && (pdf.erro || pdf.parcial || pdf.sem_texto)
       ? 'Originais registrados. Confira as limitações de extração no recibo antes da pergunta.'
-      : 'Corpus registrado. Aguardando sua pergunta.';
+      : 'Documentos registrados. Aguardando sua pergunta.';
   } catch (failure) {
     uploadError(failure.message);
     $('cadastro-status').textContent = 'Envio sem confirmação nesta tela. Consulte o inventário antes de continuar; um reenvio identifica arquivos duplicados.';
@@ -479,9 +480,46 @@ $('cadastro').addEventListener('submit', async event => {
     $('cadastro-preparar').disabled = !pdfAvailable;
   }
 });
-// Findings have independent revision/generation selectors. No implicit latest revision.
+// Findings open on the latest analysis, step and results version. The chip names what is
+// selected and reopens the selectors; an address that names a version wins over the default.
 let findingEpoch = 0, findingSequence = 0, findingCatalog = null, findingQuery = null, findingResult = null;
 let selectedFindingId = null, briefingSequence = 0, citationSequence = 0, findingCatalogSequence = 0;
+let versionCollapsed = false, versionKey = '';
+const stepNames = {r1:'Análise inicial', r2:'Revisão do suporte', r3_sintese:'Síntese'};
+const namedByRoute = id => Boolean(window.restaurandoRota?.()) && new URL(location.href).searchParams.has(id);
+function latestOption(id, allowed = () => true) {
+  return [...$(id).options].map(option => option.value).filter(value => value && allowed(value))
+    .sort((a, b) => a.localeCompare(b, undefined, {numeric:true})).at(-1) || '';
+}
+function choose(id, value) { $(id).value = value; $(id).dispatchEvent(new Event('change')); }
+function defaultAnalysis() {
+  if ($('area-achados').hidden || !$('caso').value || $('rodada').value || namedByRoute('rodada')) return false;
+  const value = latestOption('rodada');
+  if (!value) { $('achados-status').textContent = 'Esta apuração ainda não tem análises. Faça uma pergunta em Perguntar à IA.'; return false; }
+  choose('rodada', value);
+  return true;
+}
+function versionChip() {
+  const chip = $('achados-versao-chip'), ready = Boolean(findingResult && findingQuery);
+  if (!ready) versionCollapsed = false;
+  chip.hidden = !ready;
+  chip.setAttribute('aria-expanded', String(ready && !versionCollapsed));
+  $('achados-versoes').classList.toggle('versao-recolhida', versionCollapsed);
+  $('selecao-acervo').classList.toggle('versao-recolhida', versionCollapsed && !$('area-achados').hidden);
+  if (!ready) return;
+  // Analysis id and date are data; the words around them follow the interface language.
+  const day = [...$('rodada').options].find(option => option.value === findingQuery.rodada)?.dataset.dia;
+  const data = text => { const span = element('span', text); span.setAttribute('translate', 'no'); return span; };
+  const step = stepNames[findingQuery.revisao];
+  chip.replaceChildren(element('span', 'Análise'), ' ', data([findingQuery.rodada, day].filter(Boolean).join(' · ')), ' · ',
+    step ? element('span', step) : data(findingQuery.revisao.replaceAll('_', ' ')), ' · ',
+    element('span', versionCollapsed ? 'trocar' : 'fechar', 'chip-action'));
+}
+$('achados-versao-chip').addEventListener('click', () => {
+  versionCollapsed = !versionCollapsed;
+  if (!versionCollapsed) { $('acervo-escolha').open = true; $('achados-versoes').open = true; }
+  versionChip();
+});
 const humanReviewStates = {
   pendente:['Pendente','Ainda não houve conferência humana.'],
   conferida_no_original:['Conferida no original','O jornalista verificou que a fonte sustenta a afirmação.'],
@@ -512,18 +550,19 @@ function clearFindings() {
   $('achados-progresso-humano').hidden = true;
   clearFindingDetails();
   for (const name of ['buscar', 'exportar', 'anterior', 'proximo']) $('achados-' + name).disabled = true;
+  versionKey = ''; versionChip();
 }
 function resetFindings() {
   clearFindings(); findingCatalog = null;
-  options('achados-revisao', [], 'Selecione a revisão');
-  options('achados-geracao', [], 'Selecione a geração');
+  options('achados-revisao', [], 'Selecione a etapa');
+  options('achados-geracao', [], 'Selecione a versão');
   options('achados-documento', [], 'Todos');
   $('achados-form').reset();
   $('achados-so-pendentes').setAttribute('aria-pressed', 'false');
   $('achados-revisao-feedback').textContent = '';
   $('achados-versoes').open = true;
-  $('achados-versoes-resumo').textContent = 'Análise e versão dos resultados';
-  $('achados-status').textContent = 'Selecione caso e rodada; depois abra Achados da IA.';
+  $('achados-versoes-resumo').textContent = 'Etapa da análise e versão dos resultados';
+  $('achados-status').textContent = 'Escolha uma apuração para ver os achados da análise mais recente.';
 }
 // Each view opens with its area name as the only h1 and the investigation as context.
 const areaNames = {inicio:'Visão geral',cadastro:'Cadastrar arquivos',documentos:'Documentos',codex:'Perguntar à IA',
@@ -544,8 +583,8 @@ function showArea(area) {
     $('ver-' + name).setAttribute('aria-pressed', String(area === name));
   }
   $('selecao-acervo').hidden = ['inicio','cadastro','codex','gerenciar','caderno','apuracao','diligencias'].includes(area);
-  currentArea = area; areaHeading();
-  if (area === 'achados' && !findingCatalog) loadFindingsCatalog();
+  currentArea = area; areaHeading(); versionChip();
+  if (area === 'achados' && !defaultAnalysis() && !findingCatalog) loadFindingsCatalog();
   if (area === 'gerenciar') window.dispatchEvent(new Event('gerenciar-abrir'));
   if (area === 'caderno') window.dispatchEvent(new Event('caderno-abrir'));
   if (area === 'apuracao') window.dispatchEvent(new Event('apuracao-abrir'));
@@ -567,31 +606,40 @@ window.addEventListener('acervo-alterado', () => {
   loadCatalog();
 });
 for (const id of ['caso', 'rodada', 'geracao']) $(id).addEventListener('change', () => {
-  if (!$('area-achados').hidden) loadFindingsCatalog();
+  if ($('area-achados').hidden) return;
+  // A new case opens on its latest analysis, which then loads its own catalog.
+  if (id === 'caso' && defaultAnalysis()) return;
+  loadFindingsCatalog();
 });
 async function loadFindingsCatalog() {
   const scope = selection(), version = findingEpoch, request = ++findingCatalogSequence;
   if (!scope.caso || !scope.rodada) return;
-  $('achados-status').textContent = 'Consultando revisões disponíveis…';
+  $('achados-status').textContent = 'Consultando as etapas da análise…';
   try {
     const result = await api('achados-catalogo', scope);
     if (version !== findingEpoch || request !== findingCatalogSequence) return;
     findingCatalog = result;
     options('achados-revisao', result.revisoes.map(r => ({value:r, label:({r1:'Análise inicial',r2:'Revisão do suporte',r3_sintese:'Síntese'}[r] || r.replaceAll('_',' ')) + ` (${r})`})), 'Selecione a etapa');
     $('achados-status').textContent = result.estado === 'nao_produzidos'
-      ? 'Registros ainda não produzidos nesta rodada. Markdown antigo não é importado automaticamente.'
-      : `${result.revisoes.length} revisão(ões) disponível(is). Escolha a etapa da análise e a versão dos resultados.`;
+      ? 'Esta análise ainda não produziu achados. Markdown antigo não é importado automaticamente.'
+      : `${result.revisoes.length} etapa(s) disponível(is). Escolha a etapa da análise e a versão dos resultados.`;
+    const indexed = new Set((result.indices || []).map(index => index.revisao));
+    if (!$('achados-revisao').value && !namedByRoute('achados-revisao')) {
+      const revision = latestOption('achados-revisao', value => indexed.has(value));
+      if (revision) choose('achados-revisao', revision);
+    }
   } catch (failure) { if (version === findingEpoch && request === findingCatalogSequence) { findingsError(failure.message); $('achados-status').textContent = 'Erro ao consultar registros; não equivale a nenhum achado.'; } }
 }
 $('achados-revisao').addEventListener('change', () => {
   clearFindings();
   $('achados-versoes').open = true;
-  $('achados-versoes-resumo').textContent = 'Análise e versão dos resultados';
+  $('achados-versoes-resumo').textContent = 'Etapa da análise e versão dos resultados';
   const revision = $('achados-revisao').value;
   const generations = (findingCatalog?.indices || []).filter(g => g.revisao === revision);
-  options('achados-geracao', generations.map(g => ({value:g.geracao, label:`Versão ${g.geracao.replace(/^g/,'')} (${g.geracao})`})), 'Selecione a geração');
-  $('achados-status').textContent = !revision ? 'Selecione a revisão.' : generations.length
-    ? 'Escolha a versão dos resultados desta etapa.' : 'Índice derivado ausente para esta revisão. Os registros canônicos permanecem preservados; construir o índice antes de consultar.';
+  options('achados-geracao', generations.map(g => ({value:g.geracao, label:`Versão ${g.geracao.replace(/^g/,'')} (${g.geracao})`})), 'Selecione a versão');
+  $('achados-status').textContent = !revision ? 'Selecione a etapa.' : generations.length
+    ? 'Escolha a versão dos resultados desta etapa.' : 'Esta etapa ainda não tem versão de resultados para consulta. Os registros continuam preservados.';
+  if (generations.length && !namedByRoute('achados-geracao')) choose('achados-geracao', latestOption('achados-geracao'));
 });
 const findingScope = () => ({caso:$('caso').value, rodada:$('rodada').value,
   revisao:$('achados-revisao').value, geracao_achados:$('achados-geracao').value});
@@ -851,6 +899,9 @@ async function searchFindings(query) {
       return searchFindings({...query, deslocamento:Math.floor((result.total_correspondencias - 1) / query.limite) * query.limite});
     }
     findingQuery = query; findingResult = result;
+    const key = [query.caso, query.rodada, query.revisao, query.geracao_achados].join('/');
+    if (key !== versionKey) { versionKey = key; versionCollapsed = true; }
+    versionChip();
     const filterLabels = {texto:'Texto',documento:'Documento',natureza:'Natureza',suporte:'Suporte (IA)',humana:'Retorno anterior',destino:'Destino',briefing:'No briefing',revisao_humana:'Conferência do jornalista'};
     const applied = Object.entries(query.filtros || {}).filter(([,value]) => value).map(([key,value]) => `${filterLabels[key]}: ${key === 'revisao_humana' ? humanReviewStates[value][0] : pretty(value)}`);
     $('achados-filtros-ativos').textContent = `Filtros aplicados: ${applied.join(' · ')}`;
@@ -886,9 +937,10 @@ async function searchFindings(query) {
 }
 $('achados-geracao').addEventListener('change', () => {
   clearFindings();
-  $('achados-versoes-resumo').textContent = 'Análise e versão dos resultados';
+  $('achados-versoes-resumo').textContent = 'Etapa da análise e versão dos resultados';
   $('achados-versoes').open = true;
-  if ($('achados-geracao').value && !window.restaurandoMesa?.()) searchFindings({...findingScope(), filtros:findingFilters(), limite:Number($('achados-limite').value), deslocamento:0});
+  // While an address is being restored, the version it names is searched by the restore itself.
+  if ($('achados-geracao').value && !(window.restaurandoMesa?.() && namedByRoute('achados-geracao'))) searchFindings({...findingScope(), filtros:findingFilters(), limite:Number($('achados-limite').value), deslocamento:0});
 });
 $('achados-form').addEventListener('submit', event => {
   event.preventDefault();

@@ -175,7 +175,7 @@
       </form>
       <p id="cadastro-status" role="status" aria-live="polite"></p>
       <p id="cadastro-erro" role="alert" hidden></p>
-      <div id="cadastro-preparacao" class="notice" hidden><p id="cadastro-preparacao-resumo"></p><button id="cadastro-preparar" type="button" class="secondary">Preparar PDFs pendentes</button><p class="small">Usa as cópias já cadastradas, sem reenvio. A nova preparação vale para próximas conversas; rodadas anteriores são preservadas.</p></div>
+      <div id="cadastro-preparacao" class="notice" hidden><p id="cadastro-preparacao-resumo"></p><button id="cadastro-preparar" type="button" class="secondary">Preparar PDFs pendentes</button><p class="small">Usa as cópias já cadastradas, sem reenvio. A nova preparação vale para próximas conversas; análises anteriores são preservadas.</p></div>
       <div id="cadastro-recibo" hidden></div>
       <button id="cadastro-perguntar" type="button" hidden>Perguntar sobre estes documentos</button>
       <div id="cadastro-inventario" hidden></div>
@@ -204,10 +204,10 @@
         <div id="gerenciar-selecao" hidden>
           <div class="manage-case"><div><h3 id="gerenciar-nome"></h3><p id="gerenciar-resumo" class="small"></p><div id="gerenciar-tecnicos"></div></div><button id="gerenciar-excluir-caso" type="button" class="danger">Excluir apuração</button></div>
           <h3>Conversas e perguntas complementares</h3>
-          <p class="small">Excluir uma conversa também retira suas rodadas das consultas. A conversa e seus complementos são restaurados juntos.</p>
+          <p class="small">Excluir uma conversa também retira suas análises das consultas. A conversa e seus complementos são restaurados juntos.</p>
           <ul id="gerenciar-conversas" class="manage-list"></ul>
-          <h3>Rodadas avulsas</h3>
-          <p class="small">Rodadas sem vínculo com uma conversa podem ser excluídas separadamente.</p>
+          <h3>Análises avulsas</h3>
+          <p class="small">Análises sem vínculo com uma conversa podem ser excluídas separadamente.</p>
           <ul id="gerenciar-rodadas" class="manage-list"></ul>
         </div>
       </div>
@@ -266,7 +266,7 @@
     <p id="status" role="status" aria-live="polite">Carregando casos…</p>
     <p id="erro" role="alert" hidden></p>
     <div id="busca-limitacoes" class="notice" role="status" hidden></div>
-    <section id="inicio" class="empty"><h2>Selecione um caso para começar</h2><p>A pesquisa usa os documentos preservados de uma rodada existente.</p></section>
+    <section id="inicio" class="empty"><h2>Selecione um caso para começar</h2><p>A pesquisa usa os documentos preservados de uma análise existente.</p></section>
     <details id="cobertura" class="panel" hidden><summary id="cobertura-resumo">O que pode ser pesquisado neste acervo</summary><div id="cobertura-dados"></div></details>
     <section id="saida" aria-label="Resultados da pesquisa" hidden>
       <div class="section-heading"><h2 id="total" tabindex="-1"></h2><label>Formato<select id="pesquisa-formato"><option value="md">Texto com referências · Markdown</option><option value="json">Dados técnicos · JSON</option></select></label><button id="exportar" class="secondary" type="button">Exportar esta página</button></div>
@@ -281,14 +281,15 @@
       <div class="panel">
         <h2 id="titulo-achados" tabindex="-1">Achados da IA</h2>
         <p class="small">Consulte as afirmações, suas fontes e os limites. Suporte revisado pela IA e conferência humana são informações distintas.</p>
-        <details id="achados-versoes" open><summary id="achados-versoes-resumo">Análise e versão dos resultados</summary>
+        <button id="achados-versao-chip" type="button" class="secondary version-chip" aria-expanded="false" aria-controls="selecao-acervo achados-versoes" hidden></button>
+        <details id="achados-versoes" open><summary id="achados-versoes-resumo">Etapa da análise e versão dos resultados</summary>
         <div class="filters version-selectors">
           <label>Etapa da análise<select id="achados-revisao" disabled><option value="">Selecione a etapa</option></select></label>
           <label>Versão dos resultados<select id="achados-geracao" disabled><option value="">Selecione a versão</option></select></label>
         </div>
         </details>
         <form id="achados-form">
-          <div class="human-review-toolbar"><div id="achados-progresso-humano" hidden><p id="achados-progresso-texto"></p><progress id="achados-progresso" value="0" max="1" aria-label="Progresso da conferência humana"></progress><p class="small">Nesta revisão dos achados, independentemente dos filtros e da página.</p></div><div class="human-review-filter"><label>Conferência do jornalista<select id="achados-marcacao"><option value="">Todos os estados</option><option value="pendente">Pendente</option><option value="conferida_no_original">Conferida no original</option><option value="precisa_de_ajuste">Precisa de ajuste</option><option value="sem_suporte_suficiente">Sem suporte suficiente</option></select></label><button id="achados-so-pendentes" type="button" class="secondary" aria-pressed="false">Só pendentes</button></div></div>
+          <div class="human-review-toolbar"><div id="achados-progresso-humano" hidden><p id="achados-progresso-texto"></p><progress id="achados-progresso" value="0" max="1" aria-label="Progresso da conferência humana"></progress><p class="small">Nesta etapa da análise, independentemente dos filtros e da página.</p></div><div class="human-review-filter"><label>Conferência do jornalista<select id="achados-marcacao"><option value="">Todos os estados</option><option value="pendente">Pendente</option><option value="conferida_no_original">Conferida no original</option><option value="precisa_de_ajuste">Precisa de ajuste</option><option value="sem_suporte_suficiente">Sem suporte suficiente</option></select></label><button id="achados-so-pendentes" type="button" class="secondary" aria-pressed="false">Só pendentes</button></div></div>
           <label class="query-label">Pesquisar nos achados<input id="achados-texto" type="search" maxlength="2000" placeholder="Redação ou justificativas"></label>
           <details id="achados-filtros"><summary>Filtros avançados</summary>
           <div class="filters">
@@ -305,10 +306,10 @@
           <div class="actions"><button id="achados-buscar" disabled>Pesquisar achados</button><label>Formato<select id="achados-formato"><option value="md">Texto com referências · Markdown</option><option value="json">Dados técnicos · JSON</option></select></label><button id="achados-exportar" type="button" class="secondary" disabled>Exportar seleção inteira</button></div>
         </form>
       </div>
-      <p id="achados-status" role="status" aria-live="polite">Selecione caso e rodada.</p>
+      <p id="achados-status" role="status" aria-live="polite">Escolha uma apuração para ver os achados da análise mais recente.</p>
       <p id="achados-erro" role="alert" hidden></p>
       <p id="achados-revisao-feedback" role="status" aria-live="polite"></p>
-      <section class="feedback-selection" aria-label="Observações selecionadas"><p id="observacoes-contagem" role="status" aria-live="polite">Nenhuma observação selecionada.</p><p class="small">Marque as avaliações salvas que deseja levar à próxima pergunta, até 20. A seleção permanece ao mudar de página ou filtro desta revisão.</p><div class="actions"><button id="observacoes-continuar" type="button" disabled>Continuar com estas observações</button><button id="observacoes-limpar" type="button" class="secondary" disabled>Limpar seleção</button></div><p id="observacoes-erro" role="alert" hidden></p></section>
+      <section class="feedback-selection" aria-label="Observações selecionadas"><p id="observacoes-contagem" role="status" aria-live="polite">Nenhuma observação selecionada.</p><p class="small">Marque as avaliações salvas que deseja levar à próxima pergunta, até 20. A seleção permanece ao mudar de página ou filtro desta etapa.</p><div class="actions"><button id="observacoes-continuar" type="button" disabled>Continuar com estas observações</button><button id="observacoes-limpar" type="button" class="secondary" disabled>Limpar seleção</button></div><p id="observacoes-erro" role="alert" hidden></p></section>
       <div id="achados-briefings" class="actions" aria-label="Briefings disponíveis"></div>
       <section id="leitor-briefing" class="briefing-reader" aria-label="Leitura do briefing com fontes" hidden>
         <section id="achados-briefing-painel" class="panel" aria-label="Briefing e referências" hidden></section>
@@ -344,7 +345,7 @@
       <form id="continuidade-cadastro"><label>Documentos novos<input id="continuidade-arquivos" type="file" multiple required></label><label>Natureza dos documentos<select id="continuidade-natureza"><option value="nao_informada">Não informada</option><option value="publicos">Públicos</option><option value="sinteticos">Sintéticos de teste</option></select></label><button id="continuidade-cadastrar">Cadastrar documentos</button></form>
       <p id="continuidade-status" role="status" aria-live="polite"></p><p id="continuidade-erro" role="alert" hidden></p><div id="continuidade-recibo" hidden></div>
       <button id="continuidade-atualizar" type="button" class="secondary">Conferir documentos já cadastrados</button>
-      <section id="continuidade-previa" hidden><h3>Documentos que entrarão na próxima rodada</h3><div id="continuidade-documentos"></div><button id="continuidade-usar" type="button">Usar esta versão na próxima pergunta</button></section>
+      <section id="continuidade-previa" hidden><h3>Documentos que entrarão na próxima análise</h3><div id="continuidade-documentos"></div><button id="continuidade-usar" type="button">Usar esta versão na próxima pergunta</button></section>
     </dialog>
     <dialog id="revisao-dialogo" class="human-review-dialog" aria-labelledby="revisao-titulo">
       <div class="section-heading"><h2 id="revisao-titulo">Conferir achado</h2><button id="revisao-fechar" type="button" class="secondary">Fechar</button></div>

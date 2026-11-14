@@ -19,6 +19,7 @@
   const pageOffsets = {documentos:0, achados:0, caderno:0};
   let restoredOffset = 0;
   window.restaurandoMesa = () => desktop.matches && restoring;
+  window.restaurandoRota = () => restoring;
   window.paginaRestauradaMesa = name => desktop.matches && restoring && area === name ? restoredOffset : 0;
   window.registrarPaginaMesa = (name, offset) => {
     if (!desktop.matches) return;

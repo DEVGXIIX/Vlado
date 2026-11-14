@@ -68,7 +68,7 @@
           [{text:'Excluir', kind:'danger', blocked:active, run:() => window.excluirItem({tipo:'rodada', caso:selected.id, rodada:round.id}, title)}], round));
       }
       emptyList('gerenciar-conversas', 'Nenhuma conversa nesta apuração.');
-      emptyList('gerenciar-rodadas', 'Nenhuma rodada avulsa nesta apuração.');
+      emptyList('gerenciar-rodadas', 'Nenhuma análise avulsa nesta apuração.');
     }
     $('gerenciar-lixeira').replaceChildren();
     $('lixeira-contagem').textContent = `${data.lixeira.length} ${data.lixeira.length === 1 ? 'item' : 'itens'}`;
