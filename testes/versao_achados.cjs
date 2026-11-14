@@ -95,6 +95,7 @@ test('em inglês o chip e os seletores saem traduzidos', async () => {
   const mesa = await abrir('?area=achados&caso=alfa', {idioma: 'en'});
   mesa.janela.I18N.aplicar(mesa.doc.body);
   assert.equal(mesa.$('achados-versao-chip').textContent, 'Analysis R003 · 12/11 · Support review · change');
+  assert.equal(mesa.janela.I18N.traduzir('Revisão do suporte (r2)'), 'Support review (r2)');
   for (const texto of ['Selecione uma análise', 'Selecione a etapa', 'Selecione a versão', 'fechar',
     'Esta apuração ainda não tem análises. Faça uma pergunta em Perguntar à IA.']) assert.notEqual(mesa.janela.I18N.traduzir(texto), null, texto);
 });

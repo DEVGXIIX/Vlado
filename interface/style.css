@@ -380,7 +380,15 @@ main:has(#area-achados:not([hidden])) .intro{margin-bottom:16px}
 @media(max-width:1050px){
   html{scroll-padding-bottom:calc(var(--mesa-composer-height,0px) + 12px)}
   #codex-form{max-height:min(55dvh,420px)}
+  #codex-pergunta{height:76px}
   #codex-form.desktop-composer-closed{padding-block:8px}
   .desktop-composer-toolbar button{min-height:44px}
   #desktop-composicao{padding-top:8px}
 }
+/* Stepper at 12px: four steps stay on one line on a phone and scroll rather than clip. */
+@media(max-width:720px){#mesa-etapas{gap:4px;overflow-x:auto;scrollbar-width:none}#mesa-etapas a{flex:0 0 auto;gap:4px;padding-inline:2px;white-space:nowrap}}
+@media(min-width:1051px){#achados-form>.actions label select{max-width:280px}}
+/* Sidebar group labels at 12px keep to one line in the narrow sidebar. */
+.areas .eyebrow,.brand-sub{letter-spacing:.06em}
+/* On a tablet the header belongs to the investigation selector; the document version stays in Documentos. */
+@media(max-width:1050px){.app-header .header-note{display:none}}
