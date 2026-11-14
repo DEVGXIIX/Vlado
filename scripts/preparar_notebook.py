@@ -40,9 +40,11 @@ def main():
     python = target / ('Scripts/python.exe' if sys.platform == 'win32' else 'bin/python')
     if not python.is_file():
         raise ValueError('Ambiente .venv incompleto. Consulte INSTALAR_NO_NOTEBOOK.md antes de tentar novamente.')
-    requirements = 'requirements.txt' if args.somente_texto else 'requirements-piloto.txt'
-    subprocess.run([str(python), '-m', 'pip', 'install', '--disable-pip-version-check',
-                    '-r', str(ROOT / requirements)], cwd=ROOT, check=True)
+    listas = ['requirements.txt'] if args.somente_texto else ['requirements.txt', 'requirements-opcional.txt']
+    comando = [str(python), '-m', 'pip', 'install', '--disable-pip-version-check']
+    for lista in listas:
+        comando += ['-r', str(ROOT / lista)]
+    subprocess.run(comando, cwd=ROOT, check=True)
     subprocess.run([str(python), str(ROOT / 'scripts/ambiente.py')], cwd=ROOT, check=True)
     subprocess.run([str(python), str(ROOT / 'scripts/montar_fluxo.py'), '--check'], cwd=ROOT, check=True)
     subprocess.run([str(python), str(ROOT / 'scripts/verificar_projeto.py')], cwd=ROOT, check=True)
