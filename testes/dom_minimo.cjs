@@ -370,7 +370,7 @@ function analisar(html, doc) {
 // deferred <script> tags. `api` answers POST /api/* and `catalogo` answers /api/catalogo.
 const PILHA = ['i18n_en.js', 'i18n.js', 'leitura.js', 'app.js', 'revisao.js', 'observacoes.js', 'continuidade.js', 'caderno.js',
   'editor_notas.js', 'apuracao.js', 'diligencias.js', 'codex.js', 'configuracao_ia.js', 'piloto.js', 'gerenciar.js',
-  'experiencia.js', 'desktop.js', 'atalhos.js'];
+  'experiencia.js', 'desktop.js'];
 
 function criarMesa({url = 'http://127.0.0.1:8765/', papel = 'admin', modo = 'local', idioma = 'pt', desktop = true,
   catalogo = [], api = () => ({}), scripts = PILHA, armazenamento = {}, html, preparar = () => {}} = {}) {
