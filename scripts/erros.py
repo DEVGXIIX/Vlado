@@ -49,6 +49,11 @@ PADROES: tuple[tuple[str, str], ...] = (
     ('achado_sem_fontes', r'^Este achado não tem fontes vinculadas'),
     ('id_invalido', r'^ID de (evidência|achado) inválido'),
     ('nome_confirmacao_divergente', r'^Digite o nome do item'),
+    ('alcance_alterado', r'^O conteúdo do item mudou desde a conferência'),
+    ('confirmacao_ausente', r'^Confirmação ausente'),
+    ('item_fora_da_lixeira', r'^Só é possível apagar definitivamente um item que está na lixeira'),
+    ('lixeira_id_invalido', r'^Identificador da lixeira inválido'),
+    ('apagamento_incompleto', r'^Não foi possível apagar tudo'),
     ('conferencia_sem_original', r'^Para marcar “Conferida no original”'),
     ('falha_leitura', r'^Falha ao ler arquivos do servidor'),
 )

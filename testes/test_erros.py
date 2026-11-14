@@ -25,6 +25,8 @@ class CodigosTest(unittest.TestCase):
             'A etapa revisao publicou a revisão r2_revisao sem chegar a ser registrada como aceita.':
                 ('conversa_nao_retomavel', {}),
             'Cursor posterior ao histórico.': ('cursor_posterior', {}),
+            'O conteúdo do item mudou desde a conferência. Revise o alcance e confirme novamente.': ('alcance_alterado', {}),
+            'Não foi possível apagar tudo (arquivo em uso ou sem permissão).': ('apagamento_incompleto', {}),
             'O arquivo X está em execução em outro processo.': ('erro', {}),  # anchored patterns only
         }
         for mensagem, esperado in casos.items():

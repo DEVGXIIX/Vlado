@@ -286,7 +286,7 @@ class ApagamentoHttpTest(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertIn('Digite o nome', erro['erro'])
         status, erro = self.post('lixeira-apagar', {**base, 'nome': 'Título alpha', 'confirmacao': '0' * 64})
-        self.assertEqual(status, 400)
+        self.assertEqual((status, erro['codigo']), (400, 'alcance_alterado'))
         self.assertTrue((self.root / 'casos/alpha').exists())
         status, feito = self.post('lixeira-apagar', {**base, 'nome': '  título ALPHA '})
         self.assertEqual(status, 200, feito)
