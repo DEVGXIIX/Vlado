@@ -79,6 +79,15 @@
       else for (const nome of ATRIBUTOS) atributo(no, nome);
     }
   }
+  // Message for a failed API answer: the server's Portuguese as is, or English by its stable code.
+  function erro(resposta) {
+    const original = resposta?.erro || 'Não foi possível completar a operação.';
+    if (lingua !== 'en') return original;
+    const modelo = (fonte.erros || {})[resposta?.codigo];
+    if (!modelo || resposta.codigo === 'erro') return `${fonte.erroGenerico || 'The server refused the operation.'} (${original})`;
+    const vars = {...(resposta.parametros || {}), ...(Array.isArray(resposta.faltam) ? {faltam: resposta.faltam.join(', ')} : {})};
+    return Object.entries(vars).reduce((texto, [nome, valor]) => texto.split(`{${nome}}`).join(String(valor)), modelo);
+  }
   function idioma() { return lingua; }
   function definir(nova) {
     lingua = nova === 'en' ? 'en' : 'pt';
@@ -96,7 +105,7 @@
   try { salvo = localStorage.getItem(CHAVE) || ''; } catch (_) { /* Default language below. */ }
   const padrao = document.body && document.body.dataset.idiomaPadrao;
   lingua = ['pt', 'en'].includes(salvo) ? salvo : (padrao === 'en' ? 'en' : 'pt');
-  window.I18N = {t, idioma, definir, aplicar, traduzir};
+  window.I18N = {t, idioma, definir, aplicar, traduzir, erro};
   if (typeof MutationObserver === 'function' && document.documentElement) {
     new MutationObserver(registros => {
       if (lingua !== 'en') return;

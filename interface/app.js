@@ -37,7 +37,8 @@ async function api(operation, data, binary = false) {
   if (binary && response.ok) return response.blob();
   const result = await response.json();
   if (!response.ok) {
-    const failure = new Error(result.erro || 'Não foi possível completar a operação.');
+    // One place turns server errors into the interface language (by `codigo` in English).
+    const failure = new Error(window.I18N?.erro ? window.I18N.erro(result) : result.erro || 'Não foi possível completar a operação.');
     failure.result = result;
     throw failure;
   }

@@ -204,7 +204,8 @@
     } catch (error) {
       captured.busy = false;
       if (pending !== captured) return;
-      if (/mudou desde a conferência/.test(error.message)) {
+      // Matched on the server's own text: the message shown may already be in English.
+      if (/mudou desde a conferência/.test(error.result?.erro || error.message)) {
         deleteError('O conteúdo mudou desde a conferência. Confira o alcance atualizado e digite o nome de novo.');
         await loadScope();
       } else { deleteError(error.message); deleteControls(); }
