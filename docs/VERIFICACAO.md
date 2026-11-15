@@ -14,9 +14,14 @@ Branch `entrega-intercept`. Tudo com dados sintéticos; nenhum dado de reportage
 - **Instalação a partir do pacote extraído:** o ZIP foi extraído numa pasta temporária, o caso sintético cadastrado e o primeiro administrador criado com os scripts do próprio pacote; o servidor do pacote subiu em modo hospedado, a ativação pelo link de uso único e o login funcionaram pela interface (`testes/qa_pergunta_real.py`, ensaio sem chave, sem custo).
 - **Revisões:** segurança (backend, Android, isolamento) sem CRITICAL/HIGH; achados médios corrigidos (backup 0600 e preso ao ambiente, semeador recusa instalação real, empacotador mais rígido, execuções canceladas ao desativar conta ou retirar caso, IPv6 por /64, erro genérico para convidado). JS do Caderno: 3 HIGH (inserir em outra nota, sair, descartar com reenvio pendente) corrigidos com testes.
 
+- **Pergunta real paga (15/11, autorizada pelo usuário, teto de US$ 1)** — `testes/qa_pergunta_real.py` sobre o pacote `vlado-d9ae63bc10fb.zip` extraído, em modo hospedado com HTTPS de teste, conta de administração ativada pelo link e login pela interface; corpus sintético Vila Serena (contrato com texto nativo + medição digitalizada lida por OCR local):
+  - provedor OpenAI, modelo exibido e registrado `gpt-6.1-sol` (chave já salva, lida só pelo servidor);
+  - pergunta com uma parte sustentada e outra sem suporte; execução concluída e publicada em 118 s (138 s com instalação e login);
+  - 22 chamadas, 519.624 tokens de entrada (470.727 em cache), 6.138 de saída; custo estimado pelo preço de tabela do ensaio de 13/11: cerca de US$ 0,25 (confirmar no painel do provedor);
+  - resposta: valor global R$ 8.750.000,00 (D001, p. 1) e acumulado pago R$ 3.900.000,00 (D002, p. 1, documento digitalizado), com 2 citações clicáveis; sócios da construtora declarados **não localizados** nos documentos, sem inferência. Sem conferência humana. Captura: `docs/capturas/homologacao/pergunta-real.png`.
+
 ### Não verificado nesta entrega
 
-- **Pergunta real paga:** o roteiro está pronto (`testes/qa_pergunta_real.py`), mas a execução não foi autorizada nesta sessão; modelo, tempo e consumo não foram medidos nesta versão (ver ensaios de 13/11 abaixo).
 - **Docker:** imagem, `docker compose` dos três ambientes e backup/restauração em volumes Docker novos não rodaram (Docker Desktop parado). A restauração em pastas novas e em pastas ocupadas está coberta pelos testes de `backup.py`.
 - **Publicação:** não há servidor, domínio nem canal; nada entrou no ar.
 - Aparelho Android físico, TalkBack/VoiceOver, Firefox e Safari, teclado virtual real.
