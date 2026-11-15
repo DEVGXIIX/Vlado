@@ -1,5 +1,26 @@
 # Verificação do VLADO
 
+## 2.0.0 — entrega para o piloto do Intercept (15/11/2026)
+
+Branch `entrega-intercept`. Tudo com dados sintéticos; nenhum dado de reportagem.
+
+- **Suíte Python:** `python -m unittest discover -s testes` — 397 testes OK, 2 pulados de propósito (iniciador `.cmd`; permissão POSIX do backup, que não se aplica no Windows). `scripts/verificar_projeto.py` e `scripts/montar_fluxo.py --check`: OK.
+- **Testes Node do Caderno e da Mesa móvel:** 58/58 (`caderno_rascunho`, `caderno_revisao_integrada`, `caderno_notas`, `caderno_estilo`, `editor_sob_demanda`, `editor_notas`, `mobile_navegacao`).
+- **Regressões novas:** autorização por papel e revogação (`test_autorizacao.py`, 28), contas, migração v1→v2 e ativação (`test_acesso.py`, 39), persistência da tarefa marcada sem digitação, rascunho após falha de rede e conflito entre abas (`qa_caderno_editor.py` e `caderno_rascunho.cjs`), revisão integrada (`test_revisao_entrega.py`).
+- **Homologação pela interface em modo hospedado** (`testes/qa_homologacao.py`, HTTPS de teste com certificado descartável, provedor simulado): 18 verificações no navegador e 4 no servidor — redirecionamento sem sessão, erro genérico de login, faixa de homologação, logout com sessão invalidada; cadastro do lote 1 com recibo (IDs e SHA-256 conferidos) e OCR local da página digitalizada; pergunta concluída com fonte; original citado aberto e baixado com o mesmo SHA-256; conferência de achado só depois de abrir o original; trecho com fonte inserido no Caderno com "Nota salva"; lote 2 no mesmo caso sem alterar os 139 arquivos da rodada anterior; convidada A só no caso liberado; convidado B recusado nas conversas de A, em exportação e notas; retirada de caso, desativação e recuperação de acesso valendo na requisição seguinte; 390 px sem rolagem horizontal. Encontrou e corrigiu um defeito: todo login vindo de IPv4 falhava após uma correção de revisão (`acesso._rede`).
+- **Caderno no navegador** (`testes/qa_caderno_editor.py`): três estilos e níveis legados, tarefa por clique, toque e teclado com área de 44 px, marcação salva sem digitar e mantida após recarregar, ida e volta visual↔Markdown, falha de rede e rascunho restaurado, conflito entre abas, volta ao ponto da edição após abrir o original, 320/390 px, claro e escuro. Capturas em `docs/capturas/caderno/`.
+- **Mesa móvel** (`testes/qa_mobile.py`): sem rolagem horizontal em 320–1365 px e a 200 % de zoom, alvos de 44 px, teclado virtual simulado, página citada aberta no pdf.js na página certa. Capturas em `docs/capturas/mesa/`.
+- **Android:** build e lint das variantes `sala` e `redacao`; testes JVM; **só em emulador** (API 35, sem aparelho físico): login, voltar, rotação, upload, PDF na Mesa, download pela ponte com SHA-256 idêntico, abertura no visualizador do sistema, sem conexão, sessão mantida, recusa de certificado não confiável. Detalhes em `docs/ANDROID.md`.
+- **Instalação a partir do pacote extraído:** o ZIP foi extraído numa pasta temporária, o caso sintético cadastrado e o primeiro administrador criado com os scripts do próprio pacote; o servidor do pacote subiu em modo hospedado, a ativação pelo link de uso único e o login funcionaram pela interface (`testes/qa_pergunta_real.py`, ensaio sem chave, sem custo).
+- **Revisões:** segurança (backend, Android, isolamento) sem CRITICAL/HIGH; achados médios corrigidos (backup 0600 e preso ao ambiente, semeador recusa instalação real, empacotador mais rígido, execuções canceladas ao desativar conta ou retirar caso, IPv6 por /64, erro genérico para convidado). JS do Caderno: 3 HIGH (inserir em outra nota, sair, descartar com reenvio pendente) corrigidos com testes.
+
+### Não verificado nesta entrega
+
+- **Pergunta real paga:** o roteiro está pronto (`testes/qa_pergunta_real.py`), mas a execução não foi autorizada nesta sessão; modelo, tempo e consumo não foram medidos nesta versão (ver ensaios de 13/11 abaixo).
+- **Docker:** imagem, `docker compose` dos três ambientes e backup/restauração em volumes Docker novos não rodaram (Docker Desktop parado). A restauração em pastas novas e em pastas ocupadas está coberta pelos testes de `backup.py`.
+- **Publicação:** não há servidor, domínio nem canal; nada entrou no ar.
+- Aparelho Android físico, TalkBack/VoiceOver, Firefox e Safari, teclado virtual real.
+
 ## 1.4.0 — integração por API e piloto hospedado (13/11/2026)
 
 - **Testes automatizados:** 252 testes Python e 15 testes JavaScript na estação de desenvolvimento (Windows, Python 3.11). Falhas restantes: um teste de continuidade intermitente por tempo de execução (já existente antes) e, na suíte longa, os testes de exportação que rodaram antes da instalação do `python-docx` (passam depois de instalado). O teste do iniciador `.cmd` só roda com `VLADO_TESTAR_INICIADOR=1`, porque abre uma janela de console.
