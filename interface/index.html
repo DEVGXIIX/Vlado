@@ -2,11 +2,15 @@
 <html lang="pt-BR" data-theme="dark">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="session-token" content="__SESSION_TOKEN__">
   <title>Vlado</title>
   <meta name="theme-color" content="#171d1a">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icones/vlado.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icones/vlado-192.png">
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/caderno.css">
   <link rel="preload" href="/fonts/SourceSans3-Upright.otf" as="font" type="font/otf" crossorigin media="(min-width: 1051px)">
   <script src="/i18n_en.js" defer></script>
   <script src="/i18n.js" defer></script>
@@ -28,6 +32,7 @@
 </head>
 <body data-idioma-padrao="__IDIOMA_PADRAO__" data-papel="__PAPEL__" data-modo="__MODO__">
   <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+  <p id="mesa-ambiente" class="env-banner" role="note" hidden></p>
   <header class="app-header"><button id="mesa-menu" type="button" class="secondary" aria-label="Abrir navegação" aria-expanded="false" aria-controls="mesa-sidebar">☰</button><span class="brand mobile-brand">Vlado<span>.</span></span><label class="persistent-context"><span>APURAÇÃO ATUAL</span><select id="contexto-caso"><option value="">Escolha uma apuração</option></select></label><span id="mesa-versao" class="header-note">Documentos, achados e fontes</span><button id="mesa-idioma" class="secondary" type="button" translate="no" aria-label="Switch to English">English</button><button id="mesa-sair" class="secondary" type="button" hidden>Sair</button><button id="mesa-tema" class="secondary" type="button" aria-label="Ativar modo claro">Modo claro</button></header>
   <div class="app-layout">
   <aside class="sidebar" id="mesa-sidebar">
@@ -90,6 +95,7 @@
       <button id="codex-reconectar" type="button" class="secondary" hidden>Reconectar acompanhamento</button>
       <section id="codex-execucao" class="codex-run" aria-labelledby="codex-execucao-pergunta" hidden>
         <div class="codex-run-head"><span id="codex-execucao-selo" class="run-badge"></span><h3 id="codex-execucao-pergunta" translate="no"></h3></div>
+        <p id="codex-conexao-estado" class="run-connection" aria-live="polite"></p>
         <p id="codex-execucao-mensagem"></p>
         <p id="codex-execucao-causa" class="small" hidden></p>
         <ol id="codex-execucao-etapas" class="codex-run-steps" aria-label="Etapas desta pergunta"></ol>
@@ -116,27 +122,30 @@
       <h2 id="apuracao-titulo" class="sr-only">Caderno editável</h2>
       <div class="notebook-toolbar">
         <div class="actions"><button id="apuracao-nova" type="button" disabled>Nova nota</button><button id="apuracao-inserir" type="button" class="secondary" aria-expanded="false" aria-controls="apuracao-inserir-ajuda" disabled>Inserir trecho com fonte</button><label>Formato de exportação<select id="apuracao-formato"><option value="md">Markdown</option><option value="pdf">PDF</option><option value="docx">DOCX editável</option></select></label><button id="apuracao-exportar" type="button" class="secondary" disabled>Exportar</button><button id="apuracao-atualizar" type="button" class="secondary">Reabrir notas salvas</button></div>
-        <p id="apuracao-salvamento" class="save-state" role="status" aria-live="polite"></p>
       </div>
       <div class="filters"><label>Apuração selecionada<select id="apuracao-caso"><option value="">Selecione uma apuração</option></select></label></div>
       <div id="apuracao-inserir-ajuda" class="notice notebook-insert-help" hidden><p>Selecione um trecho em Pesquisar documentos ou em Achados da IA e use Inserir em nota. O trecho entra na nota aberta com a fonte.</p><div class="actions"><button id="apuracao-ir-documentos" type="button" class="secondary">Pesquisar documentos</button><button id="apuracao-ir-achados" type="button" class="secondary">Achados da IA</button></div></div>
       <p class="small notebook-note">As notas são salvas enquanto você escreve. Inserir um trecho com fonte não aprova a resposta da IA.</p>
       <p id="apuracao-status" class="small" role="status" aria-live="polite"></p><p id="apuracao-erro" role="alert" hidden></p>
       <div id="apuracao-conflito" class="notice notebook-conflict" role="alert" hidden><p>Conflito: a nota foi alterada em outra aba. Nada foi sobrescrito e o salvamento automático parou. Copie seu texto e depois recarregue a nota.</p><div class="actions"><button id="apuracao-copiar" type="button">Copiar meu texto</button><button id="apuracao-recarregar" type="button" class="secondary">Recarregar nota</button></div><p id="apuracao-conflito-status" class="small" role="status" aria-live="polite"></p><textarea id="apuracao-conflito-texto" rows="6" readonly hidden aria-label="Seu texto para copiar"></textarea></div>
+      <div id="apuracao-rascunho" class="notice caderno-rascunho" role="alert" hidden><p id="apuracao-rascunho-texto"></p><div class="actions"><button id="apuracao-rascunho-restaurar" type="button">Restaurar rascunho</button><button id="apuracao-rascunho-descartar" type="button" class="secondary">Descartar rascunho</button></div></div>
+      <div class="caderno-gavetas" role="group" aria-label="Painéis do caderno"><button id="apuracao-ver-notas" type="button" class="secondary" aria-expanded="false" aria-controls="apuracao-lista-painel">Notas</button><button id="apuracao-ver-fontes" type="button" class="secondary" aria-expanded="false" aria-controls="apuracao-fontes-painel">Fontes da nota</button></div>
+      <div id="apuracao-gaveta-fundo" class="caderno-fundo" hidden></div>
       <div class="notebook-workspace notebook-grid is-empty">
-        <nav class="notebook-notes" aria-labelledby="apuracao-notas-titulo"><h3 id="apuracao-notas-titulo">Notas</h3><ul id="apuracao-notas"></ul><p id="apuracao-notas-vazio" class="small" hidden>Nenhuma nota ainda. Use Nova nota.</p></nav>
+        <nav id="apuracao-lista-painel" class="notebook-notes caderno-painel" aria-labelledby="apuracao-notas-titulo"><div class="caderno-painel-topo"><h3 id="apuracao-notas-titulo">Notas</h3><button id="apuracao-nova-lista" type="button" class="caderno-nova-lista">Nova nota</button><button id="apuracao-fechar-notas" type="button" class="secondary caderno-fechar">Fechar</button></div><label class="caderno-busca">Buscar notas<input id="apuracao-busca" type="search" autocomplete="off" placeholder="Título da nota…"></label><p id="apuracao-busca-status" class="small" role="status" aria-live="polite"></p><ul id="apuracao-notas"></ul><p id="apuracao-notas-vazio" class="small" hidden>Nenhuma nota ainda. Use Nova nota.</p></nav>
         <section id="apuracao-editor" class="panel" aria-label="Nota aberta" hidden><form id="apuracao-form">
-          <label>Título da nota<input id="apuracao-nota-titulo" maxlength="200" required></label>
-          <p id="apuracao-autoria" class="small" hidden></p>
-          <span id="apuracao-texto-rotulo">Texto da nota</span>
-          <p id="apuracao-editor-ajuda" class="small">Escreva com formatação visual ou troque para Markdown na barra. Clique em [Fonte n] para ver a fonte.</p>
+          <label class="caderno-titulo">Título da nota<input id="apuracao-nota-titulo" maxlength="200" required></label>
+          <div class="caderno-nota-barra"><p id="apuracao-salvamento" class="save-state" role="status" aria-live="polite"></p><p id="apuracao-tarefas" class="caderno-tarefas" hidden></p><p id="apuracao-autoria" class="small" hidden></p></div>
+          <span id="apuracao-texto-rotulo" class="sr-only">Texto da nota</span>
+          <p id="apuracao-editor-ajuda" class="small">Escreva com formatação visual; Markdown e outros comandos ficam em Mais. Clique em [Fonte n] para ver a fonte.</p>
           <p id="apuracao-editor-aviso" class="small" role="status" hidden></p>
           <button id="apuracao-editor-tentar" type="button" class="secondary" hidden>Tentar carregar o editor de novo</button>
+          <div id="apuracao-formatar" class="caderno-formatar" role="toolbar" aria-label="Formatação da nota" hidden><label class="caderno-estilo"><span class="sr-only">Estilo do parágrafo</span><select id="apuracao-estilo"><option value="p">Texto normal</option><option value="h2">Título da seção</option><option value="h3">Subtítulo</option></select></label><button id="apuracao-negrito" type="button" class="caderno-comando" data-comando="bold" aria-label="Negrito" title="Negrito (Ctrl+B)"><b aria-hidden="true">N</b></button><button id="apuracao-italico" type="button" class="caderno-comando" data-comando="italic" aria-label="Itálico" title="Itálico (Ctrl+I)"><i aria-hidden="true">I</i></button><button id="apuracao-marcadores" type="button" class="caderno-comando" data-comando="list" aria-label="Lista com marcadores" title="Lista com marcadores"><span aria-hidden="true">•</span> <span class="caderno-rotulo">Lista</span></button><button id="apuracao-tarefa" type="button" class="caderno-comando" data-comando="check"><span class="caderno-caixa" aria-hidden="true"></span> Lista de tarefas</button><button id="apuracao-mais" type="button" class="caderno-comando" aria-expanded="false">Mais</button></div>
           <div id="apuracao-vditor" aria-labelledby="apuracao-texto-rotulo" aria-describedby="apuracao-editor-ajuda"></div>
           <label id="apuracao-texto-alternativo" hidden>Texto em Markdown<textarea id="apuracao-texto" rows="16" maxlength="200000"></textarea></label>
           <div class="actions"><button id="apuracao-excluir" type="button" class="danger">Excluir nota</button></div>
         </form><h3>Pré-visualização</h3><div id="apuracao-previa" class="markdown-body"></div></section>
-        <aside id="apuracao-fontes-painel" class="notebook-sources" aria-labelledby="apuracao-fontes-titulo" hidden><h3 id="apuracao-fontes-titulo">Fontes da nota</h3><div id="apuracao-fontes"></div></aside>
+        <aside id="apuracao-fontes-painel" class="notebook-sources caderno-painel" aria-labelledby="apuracao-fontes-titulo" hidden><div class="caderno-painel-topo"><h3 id="apuracao-fontes-titulo">Fontes da nota</h3><button id="apuracao-fechar-fontes" type="button" class="secondary caderno-fechar">Fechar</button></div><div id="apuracao-fontes"></div></aside>
       </div>
     </section>
     <dialog id="apuracao-adicionar-dialogo" class="human-review-dialog" aria-labelledby="apuracao-adicionar-titulo">
@@ -184,18 +193,26 @@
     </section>
     <section id="area-gerenciar" aria-labelledby="gerenciar-titulo" hidden>
       <div id="acesso-painel" class="panel" hidden>
-        <h2>Convites do piloto</h2>
+        <h2>Contas de acesso</h2>
+        <p class="small">Cada pessoa entra com login e senha próprios. Quem recebe uma conta define a senha pelo link de ativação.</p>
         <form id="acesso-form" class="ia-config" autocomplete="off">
-          <label>Nome do convidado<input id="acesso-nome" type="text" maxlength="120" required></label>
-          <label>Apurações liberadas<select id="acesso-casos" multiple size="4" required></select></label>
-          <label>Consultas por dia<input id="acesso-cota" type="number" min="1" max="500" value="20" required></label>
-          <label>Validade (dias)<input id="acesso-dias" type="number" min="1" max="365" value="14" required></label>
-          <div class="actions"><button type="submit">Criar convite</button></div>
+          <h3>Nova conta</h3>
+          <label>Nome<input id="acesso-nome" type="text" maxlength="120" required></label>
+          <label>Login<input id="acesso-login" type="text" maxlength="64" required autocapitalize="none" autocorrect="off" spellcheck="false" pattern="[a-z0-9][a-z0-9._\-]{2,63}" aria-describedby="acesso-login-dica"></label>
+          <p id="acesso-login-dica" class="small">De 3 a 64 caracteres: letras minúsculas, números, ponto, hífen ou sublinhado.</p>
+          <label>Papel<select id="acesso-papel"><option value="convidado">Convidado (só pergunta à IA)</option><option value="admin">Administração</option></select></label>
+          <label id="acesso-casos-rotulo">Apurações liberadas<select id="acesso-casos" multiple size="4"></select></label>
+          <label id="acesso-cota-rotulo">Consultas por dia<input id="acesso-cota" type="number" min="1" max="500" value="20" required></label>
+          <label>Validade do link (horas)<input id="acesso-horas" type="number" min="1" max="168" value="72" required></label>
+          <div class="actions"><button type="submit">Criar conta</button></div>
         </form>
-        <p id="acesso-link-aviso" class="small" hidden>Copie este link agora; ele não será mostrado de novo.</p>
-        <input id="acesso-link" type="text" readonly hidden translate="no">
+        <div id="acesso-link-caixa" class="notice" hidden>
+          <p id="acesso-link-aviso">Link de ativação de <strong id="acesso-link-quem" translate="no"></strong>. Envie por um canal seguro (pessoalmente ou mensageiro cifrado). Ele vale uma única vez e não será mostrado de novo.</p>
+          <div class="inline-actions"><input id="acesso-link" type="text" readonly translate="no" aria-labelledby="acesso-link-aviso"><button id="acesso-copiar" class="secondary" type="button">Copiar link</button><button id="acesso-link-fechar" class="secondary" type="button">Já enviei</button></div>
+        </div>
         <p id="acesso-mensagem" class="small" role="status" aria-live="polite"></p>
-        <ul id="acesso-lista" class="small"></ul>
+        <h3>Contas</h3>
+        <ul id="acesso-lista" class="manage-list"></ul>
       </div>
       <div class="panel">
         <div class="section-heading"><h2 id="gerenciar-titulo">Apurações e conversas</h2><button id="gerenciar-atualizar" type="button" class="secondary">Atualizar lista</button></div>
@@ -353,7 +370,7 @@
       <div class="human-review-workspace"><section aria-labelledby="revisao-fontes-titulo"><h3 id="revisao-fontes-titulo">Trechos citados</h3><div id="revisao-fontes"></div></section>
       <form id="revisao-form"><h3>Sua avaliação</h3><p class="small">Confira as fontes e escolha o estado. A marcação e a observação serão registradas separadamente do texto original da IA.</p><label>Estado da conferência<select id="revisao-estado" aria-describedby="revisao-significado revisao-guarda"><option value="pendente">Pendente</option><option value="conferida_no_original">Conferida no original</option><option value="precisa_de_ajuste">Precisa de ajuste</option><option value="sem_suporte_suficiente">Sem suporte suficiente</option></select></label><p id="revisao-guarda" class="small" hidden></p><p id="revisao-significado" class="small"></p><label>Observação (opcional)<textarea id="revisao-observacao" rows="4" maxlength="500" placeholder="Ex.: valor correto, mas refere-se ao total do contrato."></textarea></label><p class="small" id="revisao-caracteres">0 de 500 caracteres</p><p id="revisao-erro" role="alert" hidden></p><button id="revisao-salvar">Salvar marcação</button><p id="revisao-situacao" role="status" aria-live="polite"></p><div id="revisao-historico"></div></form></div>
     </dialog>
-    <dialog id="original-dialogo" aria-labelledby="original-titulo"><div class="section-heading"><h2 id="original-titulo">Conferir original</h2><button id="original-fechar" type="button" class="secondary">Fechar original</button></div><p id="original-localizacao" class="small"></p><div class="original-workspace"><blockquote id="original-referencia" hidden></blockquote><div id="original-conteudo"></div></div><button id="original-baixar" type="button" class="secondary">Baixar original</button></dialog>
+    <dialog id="original-dialogo" aria-labelledby="original-titulo"><div class="section-heading"><h2 id="original-titulo">Conferir original</h2><button id="original-fechar" type="button" class="secondary">Fechar original</button></div><p id="original-localizacao" class="small"></p><div class="original-workspace"><blockquote id="original-referencia" tabindex="0" hidden></blockquote><div id="original-conteudo"></div></div><button id="original-baixar" type="button" class="secondary">Baixar original</button></dialog>
     <footer>A interpretação por IA acontece online, pela API do provedor configurado. A conferência dos originais e a decisão editorial são humanas.</footer>
   </main>
   </div>

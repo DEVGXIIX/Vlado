@@ -7,6 +7,7 @@ from collections import OrderedDict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from http.cookies import SimpleCookie
 import hashlib
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -47,14 +48,31 @@ DILIGENCIAS_OPERACOES = ('diligencias-listar', 'diligencias-criar', 'diligencias
                         'diligencias-responder', 'diligencias-original')
 # Provider choice and API key; the key is write-only from the browser's point of view.
 IA_OPERACOES = ('ia-config', 'ia-config-salvar')
-# Pilot mode: invitations (admin only) and what an invited guest may call.
-ACESSO_OPERACOES = ('acesso-listar', 'acesso-criar', 'acesso-revogar')
+# Hosted mode: account management (admin only) and what a guest account may call.
+CONTAS_OPERACOES = ('contas-listar', 'contas-criar', 'contas-atualizar', 'contas-desativar', 'contas-reativar',
+                    'contas-recuperar')
 OPERACOES_CONVIDADO = ('codex-status', 'codex-listar', 'codex-perguntar', 'codex-eventos', 'codex-cancelar',
                        'codex-retomar', 'codex-original', 'sessao-sair')
+# Guest operations on an existing conversation: the conversation's case is checked on every call.
+OPERACOES_CONVERSA = ('codex-eventos', 'codex-cancelar', 'codex-original', 'codex-retomar')
+# Before a session exists (hosted mode only): Origin + JSON, no CSRF, small bodies.
+OPERACOES_PUBLICAS = ('entrar', 'ativar', 'ativacao-consultar')
+AMBIENTES = ('homologacao', 'editorial', 'demonstracao')
+SEM_SESSAO = 'Sessão expirada ou encerrada. Entre novamente.'
 # Asking and retrying both spend one of the guest's daily questions (given back if refused).
 OPERACOES_COM_COTA = ('codex-perguntar', 'codex-retomar')
-COOKIE_PILOTO = 'vlado_sessao'
+ATIVOS_CONVERSA = frozenset({'preparando', 'executando', 'publicando'})
+CAMPOS_INTERNOS_CONVERSA = frozenset({'dono', 'thread_id', 'turn_id', 'politica'})
+COOKIE_PILOTO ='vlado_sessao'
 MAXIMO_SESSOES_ORIGINAIS = 5000
+
+
+def _sem_internos(result):
+    """Guests see their conversation, not the owner id or provider thread/turn identifiers."""
+    if not isinstance(result, dict) or not isinstance(result.get('conversa'), dict):
+        return result
+    conversa = {k: v for k, v in result['conversa'].items() if k not in CAMPOS_INTERNOS_CONVERSA}
+    return {**result, 'conversa': conversa}
 
 
 def receber_documentos(root, data):
@@ -256,6 +274,8 @@ def executar(root, operation, data, conta=None, originais_abertos=None):
 
 class Servidor(ThreadingHTTPServer):
     daemon_threads = True
+    # A page load opens many parallel requests; the default backlog (5) refuses some on Windows.
+    request_queue_size = 64
     allow_reuse_address = False
 
     def server_bind(self):
@@ -316,7 +336,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(content)))
         self.send_header('Cache-Control', cache)
         self.send_header('X-Content-Type-Options', 'nosniff')
-        self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; frame-src 'self' blob:; img-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+        self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; worker-src 'self'; manifest-src 'self'; frame-src 'self' blob:; img-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
         self.send_header('Referrer-Policy', 'no-referrer')
         if self.server.modo == 'piloto':
             self.send_header('Strict-Transport-Security', 'max-age=31536000')
@@ -366,57 +386,85 @@ class Handler(BaseHTTPRequestHandler):
             return None, sid
 
     def _principal(self):
-        """Who is calling: in local mode the single operator (admin); in pilot mode the invitation session."""
-        if self.server.modo == 'local':
-            return {'papel': 'admin', 'convite': None, 'casos': None, 'csrf': self.server.token}
-        return self._sessao_piloto()[0]
+        """Who is calling: in local mode the single operator (admin); in hosted mode the account session.
 
-    def _proibido(self, mensagem='Operação não permitida para este acesso.'):
-        self._json(403, {'estado': 'proibido', 'erro': mensagem})
+        Read once per request: the account is re-read from the store on every request, so deactivation,
+        role and case changes apply to the next one."""
+        if self.server.modo == 'local':
+            return {'papel': 'admin', 'conta': None, 'nome': None, 'login': None, 'casos': None,
+                    'csrf': self.server.token}
+        if not hasattr(self, '_principal_requisicao'):
+            self._principal_requisicao = self._sessao_piloto()[0]
+        return self._principal_requisicao
+
+    def _proibido(self, mensagem='Operação não permitida para este acesso.', codigo=None):
+        self._json(403, {'estado': 'proibido', 'erro': mensagem, **({'codigo': codigo} if codigo else {})})
 
     def _sem_principal(self, api=False):
         if getattr(self, 'acesso_indisponivel', False):
             self._json(503, {'estado': 'indisponivel', 'erro': 'Registro de acesso indisponível. Avise a administração.'})
         elif api:
-            self._json(401, {'estado': 'sem_sessao', 'erro': 'Sessão expirada ou convite revogado. Abra novamente o link do convite.'})
+            self._json(401, {'estado': 'sem_sessao', 'codigo': 'sessao_expirada', 'erro': SEM_SESSAO})
         else:
-            self._sem_convite()
+            self._send(303, b'', 'text/plain; charset=utf-8', {'Location': '/entrar'})
 
-    def _sem_convite(self):
-        texto = ('Acesso somente por convite. Abra o link que você recebeu. / '
-                 'Access by invitation only. Open the link you received.')
-        self._send(401, f'<!doctype html><meta charset="utf-8"><title>Vlado</title><p>{texto}</p>'.encode('utf-8'),
-                   'text/html; charset=utf-8')
+    def _convite_antigo(self):
+        """Old invitation links no longer sign anyone in; they point to the account sign-in page."""
+        texto = ('<p lang="pt-BR">Os convites por link foram substituídos por contas individuais. '
+                 'Peça à administração o link de ativação da sua conta, ou <a href="/entrar">entre com login e senha</a>.</p>'
+                 '<p lang="en">Invitation links were replaced by individual accounts. Ask the administrators for your '
+                 'account activation link, or <a href="/entrar">sign in with your login and password</a>.</p>')
+        self._send(410, (f'<!doctype html><html lang="pt-BR"><meta charset="utf-8">'
+                         f'<meta name="viewport" content="width=device-width, initial-scale=1">'
+                         f'<title>Vlado</title><link rel="stylesheet" href="/style.css"><main class="panel">{texto}</main></html>'
+                         ).encode('utf-8'), 'text/html; charset=utf-8')
 
-    def _aceitar_convite(self, token):
-        try:
-            sid, _ = acesso.aceitar(self.server.root, token)
-        except ValueError as exc:
-            self._send(403, f'<!doctype html><meta charset="utf-8"><title>Vlado</title><p>{exc}</p>'.encode('utf-8'),
-                       'text/html; charset=utf-8')
+    def _ambiente_publico(self):
+        if self.server.modo != 'piloto':
+            return None
+        valor = os.environ.get('VLADO_AMBIENTE', '').strip()
+        return valor if valor in AMBIENTES else 'homologacao'
+
+    def _ip(self):
+        """Socket address; behind a trusted proxy (VLADO_CONFIAR_PROXY=1) the last X-Forwarded-For hop."""
+        if os.environ.get('VLADO_CONFIAR_PROXY', '').strip() == '1':
+            saltos = [s.strip() for s in self.headers.get('X-Forwarded-For', '').split(',') if s.strip()]
+            try:
+                return str(ipaddress.ip_address(saltos[-1])) if saltos else self.client_address[0]
+            except ValueError:
+                pass  # garbage in the header: fall back to the socket address
+        return self.client_address[0]
+
+    def _sessao_atual(self):
+        principal = self._principal()
+        if principal is None:
+            self._sem_principal(api=True)
             return
-        cookie = (f'{COOKIE_PILOTO}={sid}; HttpOnly; Secure; SameSite=Strict; Path=/; '
-                  f'Max-Age={acesso.SESSAO_HORAS * 3600}')
-        # Guests land on the ask area; with a single released case it is already selected.
-        try:
-            casos = (acesso.sessao(self.server.root, sid) or {}).get('casos') or []
-        except (ValueError, OSError):
-            casos = []
-        destino = '/?area=codex' + (f'&caso={quote(casos[0], safe="")}' if len(casos) == 1 else '')
-        self._send(303, b'', 'text/plain; charset=utf-8', {'Location': destino, 'Set-Cookie': cookie})
+        conta = {k: principal.get(k) for k in ('nome', 'login', 'papel', 'casos')}
+        conta['id'] = principal.get('conta')
+        self._json(200, {'conta': conta, 'csrf': principal['csrf'], 'ambiente': self._ambiente_publico(),
+                         'modo': self.server.modo, 'expira_em': principal.get('expira_em')})
 
     def do_GET(self):
+        self.__dict__.pop('_principal_requisicao', None)  # one account lookup per request, even with keep-alive
         if not self._allowed():
             return
         path = urlsplit(self.path).path
         if path == '/saude':
             self._json(200, {'ok': True})
             return
+        if path == '/api/sessao':
+            self._sessao_atual()
+            return
         if self.server.modo == 'piloto':
             if path.startswith('/convite/'):
-                self._aceitar_convite(path.removeprefix('/convite/'))
+                self._convite_antigo()
                 return
-            if path in ('/', '/api/catalogo') and self._principal() is None:
+            if path == '/entrar' or re.fullmatch(r'/ativar(/[A-Za-z0-9_-]{1,100})?', path):
+                # Static page without case data; the token stays in the path, read by entrar.js.
+                self._send(200, (ASSETS / 'entrar.html').read_bytes(), 'text/html; charset=utf-8')
+                return
+            if path in ('/', '/api/catalogo', '/api/integracao') and self._principal() is None:
                 self._sem_principal(api=path != '/')
                 return
         if path == '/api/integracao':
@@ -441,6 +489,8 @@ class Handler(BaseHTTPRequestHandler):
                   '/i18n_en.js': ('i18n_en.js', 'text/javascript; charset=utf-8'),
                   '/configuracao_ia.js': ('configuracao_ia.js', 'text/javascript; charset=utf-8'),
                   '/piloto.js': ('piloto.js', 'text/javascript; charset=utf-8'),
+                  '/entrar.js': ('entrar.js', 'text/javascript; charset=utf-8'),
+                  '/entrar.css': ('entrar.css', 'text/css; charset=utf-8'),
                   '/gerenciar.js': ('gerenciar.js', 'text/javascript; charset=utf-8'),
                   '/leitura.js': ('leitura.js', 'text/javascript; charset=utf-8'),
                   '/experiencia.js': ('experiencia.js', 'text/javascript; charset=utf-8'),
@@ -460,7 +510,15 @@ class Handler(BaseHTTPRequestHandler):
                   '/vendor/vditor/dist/css/content-theme/light.css': ('vendor/vditor/dist/css/content-theme/light.css', 'text/css; charset=utf-8'),
                   '/fonts/SourceSerif4-Roman.ttf': ('fonts/SourceSerif4-Roman.ttf', 'font/ttf'),
                   '/fonts/SourceSans3-Upright.otf': ('fonts/SourceSans3-Upright.otf', 'font/otf'),
-                  '/style.css': ('style.css', 'text/css; charset=utf-8')}
+                  '/vendor/pdfjs/legacy/build/pdf.min.mjs': ('vendor/pdfjs/legacy/build/pdf.min.mjs', 'text/javascript; charset=utf-8'),
+                  '/vendor/pdfjs/legacy/build/pdf.worker.min.mjs': ('vendor/pdfjs/legacy/build/pdf.worker.min.mjs', 'text/javascript; charset=utf-8'),
+                  '/manifest.webmanifest': ('manifest.webmanifest', 'application/manifest+json; charset=utf-8'),
+                  '/icones/vlado.svg': ('icones/vlado.svg', 'image/svg+xml'),
+                  '/icones/vlado-192.png': ('icones/vlado-192.png', 'image/png'),
+                  '/icones/vlado-512.png': ('icones/vlado-512.png', 'image/png'),
+                  '/icones/vlado-maskable-512.png': ('icones/vlado-maskable-512.png', 'image/png'),
+                  '/style.css': ('style.css', 'text/css; charset=utf-8'),
+                  '/caderno.css': ('caderno.css', 'text/css; charset=utf-8')}
         if path not in assets:
             self._json(404, {'erro': 'Página não encontrada.'})
             return
@@ -488,10 +546,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, content, content_type, {'ETag': etag}, cache=cache)
 
     def do_POST(self):
+        self.__dict__.pop('_principal_requisicao', None)
         if self.server.modo == 'piloto':
             # Never read (up to 72 MB of) a body for anonymous or foreign-host requests.
             if not self._allowed():
                 self.close_connection = True
+                return
+            if urlsplit(self.path).path.removeprefix('/api/') in OPERACOES_PUBLICAS:
+                self._publico(urlsplit(self.path).path.removeprefix('/api/'))
                 return
             if self._principal() is None:
                 self.close_connection = True
@@ -536,7 +598,7 @@ class Handler(BaseHTTPRequestHandler):
                             'codex-desligar', 'codex-observacoes', 'codex-corpus-previa', 'codex-documentos-cadastrar', 'codex-caderno-previa', 'codex-diligencias-previa')
         if operation not in (*codex_operations, *apuracao.OPERACOES, *apuracao.OPERACOES_NOTAS, *CADERNO_OPERACOES, *DILIGENCIAS_OPERACOES, 'analises', 'buscar', 'ler', 'cobertura', 'original', 'cadastrar', 'inventario',
                              'ambiente', 'preparar-pdfs',
-                             'gerenciar-listar', 'excluir', 'restaurar', 'lixeira-alcance', 'lixeira-apagar', *IA_OPERACOES, *ACESSO_OPERACOES, 'sessao-sair',
+                             'gerenciar-listar', 'excluir', 'restaurar', 'lixeira-alcance', 'lixeira-apagar', *IA_OPERACOES, *CONTAS_OPERACOES, 'sessao-sair',
                              'achados-revisao-salvar',
                              'achados-catalogo', 'achados-buscar', 'achados-detalhe',
                              'achados-evidencia', 'achados-original', 'achados-exportar', 'achados-briefing'):
@@ -548,16 +610,19 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError('Requisição deve ser um objeto JSON.')
             negado = self._negado(operation, data, principal)
             if negado:
-                self._proibido(negado)
+                self._proibido(*negado)
                 return
-            dono = principal['convite'] if principal['papel'] != 'admin' else None
+            convidado = principal['papel'] != 'admin'
+            dono = principal['conta'] if convidado else None
+            # A guest reaches its own conversations only while their case is still released (re-read each request).
+            casos_liberados = (principal['casos'] or []) if convidado else None
             if operation == 'sessao-sair':
                 acesso.encerrar(self.server.root, self._sessao_piloto()[1])
                 self._send(200, b'{"estado": "encerrada"}', extra={
                     'Set-Cookie': f'{COOKIE_PILOTO}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'})
                 return
-            if operation in ACESSO_OPERACOES:
-                self._json(200, self._acesso(operation, data))
+            if operation in CONTAS_OPERACOES:
+                self._json(200, self._contas(operation, data, principal))
                 return
             consulta_contada = False
             if operation in OPERACOES_COM_COTA and dono is not None:
@@ -605,7 +670,7 @@ class Handler(BaseHTTPRequestHandler):
                         raise ValueError('Digite o nome do item exatamente como mostrado para confirmar.')
                     result = lixeira.apagar_definitivamente(
                         self.server.root, data.get('item'), data.get('confirmacao'),
-                        quem=principal.get('nome') or principal.get('convite') or 'operador local',
+                        quem=principal.get('nome') or principal.get('conta') or 'operador local',
                         gerenciador=self.server.conversas)
             elif operation in ('gerenciar-listar', 'excluir', 'restaurar'):
                 with self.server.cadastro_lock:
@@ -626,7 +691,7 @@ class Handler(BaseHTTPRequestHandler):
                     threading.Thread(target=self.server.shutdown, daemon=True).start()
                     return
                 if operation == 'codex-original':
-                    path = manager.fonte(data.get('conversa'), data.get('referencia'), dono=dono)
+                    path = manager.fonte(data.get('conversa'), data.get('referencia'), dono=dono, casos=casos_liberados)
                     self._send(200, path.read_bytes(), 'application/octet-stream',
                                {'Content-Disposition': f'attachment; filename="original{path.suffix}"'})
                     return
@@ -643,8 +708,7 @@ class Handler(BaseHTTPRequestHandler):
                         raise
                 elif operation == 'codex-retomar':
                     try:
-                        result = manager.retomar(data.get('conversa'), dono=dono,
-                                                 casos=(principal['casos'] or []) if dono is not None else None)
+                        result = manager.retomar(data.get('conversa'), dono=dono, casos=casos_liberados)
                     except FileNotFoundError as exc:
                         if consulta_contada:
                             acesso.devolver_consulta(self.server.root, dono)
@@ -667,11 +731,14 @@ class Handler(BaseHTTPRequestHandler):
                         result = receber_documentos(self.server.root, {'caso': data.get('caso'),
                             'arquivos': data.get('arquivos'), 'natureza': data.get('natureza', 'nao_informada')})
                 elif operation == 'codex-eventos':
-                    result = manager.eventos(data.get('conversa'), data.get('cursor', 0), data.get('espera', 0), dono=dono)
+                    result = manager.eventos(data.get('conversa'), data.get('cursor', 0), data.get('espera', 0), dono=dono,
+                                             casos=casos_liberados)
                 elif operation == 'codex-cancelar':
-                    result = manager.cancelar(data.get('conversa'), dono=dono)
+                    result = manager.cancelar(data.get('conversa'), dono=dono, casos=casos_liberados)
+                if dono is not None:
+                    result = _sem_internos(result)
             else:
-                conta = ({'id': principal['convite'], 'nome': principal['nome']}
+                conta = ({'id': principal['conta'], 'nome': principal['nome']}
                          if self.server.modo == 'piloto' else None)
                 abertos = (self.server.originais_abertos(self._chave_originais(principal, data))
                            if operation == 'achados-revisao-salvar' else None)
@@ -694,40 +761,126 @@ class Handler(BaseHTTPRequestHandler):
             self._json(409, {'estado': 'erro', 'codigo': 'conflito', 'erro': str(exc), 'atual': exc.atual})
         except (ValueError, OSError, KeyError, TypeError, sqlite3.Error) as exc:
             convidado = principal['papel'] != 'admin'
-            mensagem = ('Falha ao ler arquivos do servidor.' if convidado and isinstance(exc, OSError) else str(exc))
+            # Guests get user-facing ValueError messages only; internal errors stay generic.
+            mensagem = ('Falha ao processar a requisição no servidor.'
+                        if convidado and not isinstance(exc, ValueError) else str(exc))
             self._json(400, {'estado': 'erro', 'erro': mensagem}, exc)
 
     def _negado(self, operation, data, principal):
-        """Authorization by role. Returns the refusal message, or None when allowed."""
+        """Authorization by role, checked on every request. Returns (message, code) or None when allowed."""
         if self.server.modo == 'piloto' and operation == 'codex-desligar':
-            return 'O serviço hospedado não pode ser encerrado pela interface.'
-        if operation in ACESSO_OPERACOES and self.server.modo != 'piloto':
-            return 'Convites só existem no modo piloto.'
+            return 'O serviço hospedado não pode ser encerrado pela interface.', 'servico_nao_encerravel'
+        if operation in CONTAS_OPERACOES and self.server.modo != 'piloto':
+            return 'Contas só existem no modo hospedado.', 'operacao_proibida'
         if principal['papel'] == 'admin':
             return None
         if operation not in OPERACOES_CONVIDADO:
-            return 'Operação não permitida para convidados.'
+            return 'Operação não permitida para esta conta.', 'operacao_proibida'
         if operation in ('codex-listar', 'codex-perguntar') and data.get('caso') not in (principal['casos'] or []):
-            return 'Apuração não liberada para este convite.'
+            return 'Apuração não liberada para esta conta.', 'caso_nao_liberado'
         if operation == 'codex-perguntar' and set(data) - {'caso', 'pergunta', 'conversa'}:
-            return 'Convidados enviam somente a pergunta e a conversa.'
+            return 'Convidados enviam somente a pergunta e a conversa.', 'campos_nao_permitidos'
         if operation == 'codex-retomar' and set(data) - {'conversa'}:
-            return 'Convidados enviam somente a conversa a retomar.'
+            return 'Convidados enviam somente a conversa a retomar.', 'campos_nao_permitidos'
         return None
 
-    def _acesso(self, operation, data):
+    def _contas(self, operation, data, principal):
+        """Account management (admin only, hosted mode). Activation links are returned once, never stored."""
+        root, por = self.server.root, principal['conta'] or 'cli'
+        if operation == 'contas-listar':
+            return {'contas': acesso.listar(root), 'eventos': acesso.eventos(root, 50)}
+        if operation in ('contas-criar', 'contas-atualizar') and data.get('casos') is not None:
+            casos = data.get('casos')
+            disponiveis = {c['id'] for c in catalogo(root)['casos']}
+            if not isinstance(casos, list) or not all(isinstance(c, str) for c in casos) or not set(casos) <= disponiveis:
+                raise ValueError('Escolha apurações existentes para a conta.')
+        horas = data.get('horas', acesso.ATIVACAO_HORAS)
+        if operation == 'contas-criar':
+            papel = data.get('papel', 'convidado')
+            registro, token = acesso.criar_conta(root, data.get('nome'), data.get('login'), papel=papel,
+                                                 casos=data.get('casos') or [], cota_diaria=data.get('cota_diaria', 20),
+                                                 horas=horas, por=por)
+            return {'conta': registro, 'link': f'{self.server.origin}/ativar/{token}'}
+        if operation == 'contas-recuperar':
+            registro, token = acesso.recuperar(root, data.get('id'), por=por, horas=horas)
+            return {'conta': registro, 'link': f'{self.server.origin}/ativar/{token}'}
+        if operation == 'contas-desativar':
+            registro = acesso.desativar(root, data.get('id'), por=por)
+            self._parar_execucoes(registro['id'], ())
+            return {'conta': registro}
+        if operation == 'contas-reativar':
+            return {'conta': acesso.reativar(root, data.get('id'), por=por)}
+        campos = {k: data[k] for k in ('nome', 'papel', 'casos', 'cota_diaria') if data.get(k) is not None}
+        registro = acesso.atualizar(root, data.get('id'), por=por, **campos)
+        if registro.get('papel') != 'admin':
+            self._parar_execucoes(registro['id'], registro.get('casos') or ())
+        return {'conta': registro}
+
+    def _parar_execucoes(self, conta_id, casos_mantidos):
+        """A deactivated account, or a case taken away, must not keep spending the API in the background."""
+        manager = self.server.conversas
+        with manager.lock:
+            alvos = [cid for cid, ctx in manager.contexts.items()
+                     if ctx['meta'].get('dono') == conta_id and ctx['meta'].get('caso') not in casos_mantidos
+                     and ctx['meta'].get('estado') in ATIVOS_CONVERSA]
+        for identificador in alvos:
+            try:
+                manager.cancelar(identificador)
+            except (ValueError, OSError, KeyError):
+                pass  # already finished or removed: nothing left to stop
+
+    def _publico(self, operation):
+        """Sign-in and activation, before any session: Origin + JSON, small body, generic refusals."""
+        try:
+            length = int(self.headers.get('Content-Length', '0'))
+        except ValueError:
+            length = -1
+        if not 0 < length <= 4096:
+            self.close_connection = True
+            self._json(400, {'erro': 'Requisição vazia ou muito grande.'})
+            return
+        body = self.rfile.read(length)
+        if (self.headers.get('Origin') != self.server.origin
+                or self.headers.get_content_type() != 'application/json'):
+            self._json(403, {'erro': 'Origem ou sessão não autorizada. Recarregue a página.'})
+            return
+        try:
+            data = json.loads(body)
+            if not isinstance(data, dict):
+                raise ValueError('Requisição deve ser um objeto JSON.')
+        except ValueError:
+            self._json(400, {'erro': 'Requisição deve ser um objeto JSON.'})
+            return
         root = self.server.root
-        if operation == 'acesso-listar':
-            return {'convites': acesso.listar(root)}
-        if operation == 'acesso-revogar':
-            return {'convite': acesso.revogar(root, data.get('id'))}
-        casos = data.get('casos')
-        disponiveis = {c['id'] for c in catalogo(root)['casos']}
-        if not isinstance(casos, list) or not set(casos) <= disponiveis:
-            raise ValueError('Escolha apurações existentes para o convite.')
-        registro, token = acesso.criar_convite(root, data.get('nome'), casos=casos,
-                                               cota_diaria=data.get('cota_diaria', 20), dias=data.get('dias', 14))
-        return {'convite': registro, 'link': f'{self.server.origin}/convite/{token}'}
+        try:
+            if operation == 'entrar':
+                sid, csrf, conta = acesso.entrar(root, data.get('login'), data.get('senha'), ip=self._ip(),
+                                                 cliente=data.get('cliente', 'web'))
+                casos = conta.get('casos') or []
+                destino = ('/' if conta['papel'] == 'admin'
+                           else '/?area=codex' + (f'&caso={quote(casos[0], safe="")}' if len(casos) == 1 else ''))
+                publica = {k: conta[k] for k in ('id', 'nome', 'login', 'papel', 'casos')}
+                self._send(200, json.dumps({'conta': publica, 'csrf': csrf, 'destino': destino},
+                                           ensure_ascii=False).encode('utf-8'),
+                           extra={'Set-Cookie': f'{COOKIE_PILOTO}={sid}; HttpOnly; Secure; SameSite=Strict; Path=/'})
+            elif operation == 'ativacao-consultar':
+                acesso.limitar_ip(self._ip())
+                self._json(200, acesso.consultar_ativacao(root, data.get('token')))
+            else:
+                acesso.limitar_ip(self._ip())
+                conta = acesso.ativar(root, data.get('token'), data.get('senha'))
+                self._json(200, {'estado': 'senha_definida', 'login': conta['login']})
+        except acesso.RegistroIlegivel:
+            self._json(503, {'estado': 'indisponivel', 'erro': 'Registro de acesso indisponível. Avise a administração.'})
+        except acesso.Bloqueado as exc:
+            self._json(429, {'estado': 'bloqueado', 'codigo': 'bloqueado', 'erro': str(exc)})
+        except acesso.CredenciaisInvalidas as exc:
+            self._json(401, {'estado': 'credenciais', 'codigo': 'credenciais', 'erro': str(exc)})
+        except acesso.AtivacaoInvalida as exc:
+            self._json(400, {'estado': 'erro', 'codigo': 'ativacao_invalida', 'erro': str(exc)})
+        except (ValueError, OSError) as exc:
+            self._json(400, {'estado': 'erro', 'codigo': 'senha_invalida' if operation == 'ativar' else 'requisicao_invalida',
+                             'erro': str(exc) if isinstance(exc, ValueError) else 'Falha ao ler arquivos do servidor.'})
 
     def log_message(self, format, *args):
         # Do not print queries, source content or token to the terminal.
@@ -740,7 +893,7 @@ def main():
     parser.add_argument('--porta', type=int, default=8765)
     parser.add_argument('--sem-abrir', action='store_true')
     parser.add_argument('--modo', choices=('local', 'piloto'), default='local',
-                        help='piloto: acesso por convite atrás de um proxy HTTPS (ver docs/IMPLANTACAO_PILOTO.md)')
+                        help='piloto: contas com login e senha atrás de um proxy HTTPS (ver docs/GUIA_TECNICO_IMPLANTACAO.md)')
     parser.add_argument('--host', default='127.0.0.1', help='Endereço de escuta; no contêiner use 0.0.0.0')
     parser.add_argument('--origem', help='Endereço público HTTPS do piloto, ex.: https://vlado.example.org')
     args = parser.parse_args()

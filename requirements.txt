@@ -10,3 +10,5 @@ reportlab==4.4.9
 # Inferência via API (provedor em configuracao.json; chave só no ambiente do servidor).
 anthropic==2.8.0
 openai==3.50.0
+# Hash de senha das contas da Mesa hospedada (argon2id).
+argon2-cffi==25.1.0

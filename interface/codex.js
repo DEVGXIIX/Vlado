@@ -60,6 +60,43 @@
   const stepStates = {aceita:'aceita', proxima:'próxima', pendente:'pendente'};
   const guest = () => document.body?.dataset.papel === 'convidado';
   let run = null, retrying = false, resumed = null;
+  // Network loss while following a run: the server keeps executing; the poll retries with
+  // backoff (or as soon as the browser is back online) from the same cursor.
+  const RECONNECT_MS = [1000, 2000, 4000, 8000, 15000, 30000];
+  let reconnecting = false, wake = null;
+  const offline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
+  window.addEventListener('online', () => wake?.());
+  window.addEventListener('offline', () => {
+    if (!reconnecting) return;
+    $('codex-status').textContent = connectionTexts.offline;
+    controls();
+  });
+  function pause(ms) {
+    return new Promise(resolve => {
+      const done = () => { clearTimeout(timer); if (wake === done) wake = null; resolve(); };
+      const timer = setTimeout(done, ms);
+      wake = done;
+    });
+  }
+  const connectionTexts = {
+    rede: 'Conexão perdida — a execução continua no servidor; reconectando…',
+    offline: 'Sem conexão neste aparelho — a execução continua no servidor; reconectando quando a rede voltar…',
+    andamento: 'Em andamento — acompanhando a execução.',
+    retomavel: 'Interrompida — retomar com o botão abaixo.'};
+  function connection(current) {
+    const line = $('codex-conexao-estado');
+    if (!line) return;
+    const running = current && ['em_andamento', 'cancelando'].includes(current.codigo);
+    const mode = !current ? '' : reconnecting ? (offline() ? 'offline' : 'rede') : running ? 'andamento'
+      : run?.retomavel === true && current.causa !== 'contexto' ? 'retomavel' : '';
+    if (line.dataset.conexao === mode) return;
+    line.dataset.conexao = mode;
+    $('codex-execucao').dataset.conexao = mode;
+    // Always rendered (an empty line has no height) so screen readers announce changes; the
+    // routine "in progress" state is shown without being announced again.
+    line.setAttribute('aria-live', mode === 'andamento' ? 'off' : 'polite');
+    line.textContent = mode ? connectionTexts[mode] : '';
+  }
   // Conversations saved before `situacao` existed carry only `estado`.
   function situation(record) {
     if (record?.situacao?.codigo) return record.situacao;
@@ -101,6 +138,7 @@
   function runBlock() {
     const current = conversation ? situation(run) : null;
     $('codex-execucao').hidden = !current || current.codigo === 'concluido';
+    connection($('codex-execucao').hidden ? null : current);
     if ($('codex-execucao').hidden) return;
     $('codex-execucao-selo').textContent = t(badges[current.codigo] || current.codigo);
     $('codex-execucao-selo').className = 'run-badge run-' + current.codigo;
@@ -115,7 +153,7 @@
     const running = ['em_andamento', 'cancelando'].includes(current.codigo);
     $('codex-execucao-aviso').textContent = running && resumed ? resumeText(resumed) : '';
     $('codex-execucao-aviso').hidden = !(running && resumed);
-    const idle = !active && !submitting && !trackingPending && !trackingFailed;
+    const idle = !active && !submitting && !trackingPending && !trackingFailed && !reconnecting;
     const button = $('codex-retomar'), next = run.progresso ? run.progresso.proxima : undefined;
     button.hidden = run.retomavel !== true || current.causa === 'contexto' || !(idle || retrying);
     button.disabled = retrying;
@@ -128,7 +166,7 @@
     $('codex-erro').hidden = !message;
   }
   function controls() {
-    const blocked = active || submitting || trackingPending || retrying;
+    const blocked = active || submitting || trackingPending || retrying || reconnecting;
     $('codex-enviar').disabled = blocked || trackingFailed || !$('codex-caso').value;
     $('codex-pergunta').disabled = submitting || !$('codex-caso').value;
     $('codex-cancelar').disabled = !conversation || !(active || trackingFailed || trackingPending);
@@ -167,7 +205,7 @@
     $('codex-diligencias').hidden=!pendingDiligences;$('codex-diligencias-lista').replaceChildren();
     if(pendingDiligences)window.mostrarDiligencias($('codex-diligencias-lista'),pendingDiligences.preview.conteudo);
   }
-  window.estadoConversa = () => ({caso:$('codex-caso').value,conversa:conversation,ocupada:active||submitting||trackingPending||trackingFailed,
+  window.estadoConversa = () => ({caso:$('codex-caso').value,conversa:conversation,ocupada:active||submitting||trackingPending||trackingFailed||reconnecting,
     atualizar_corpus:pendingCorpus?structuredClone(pendingCorpus.solicitacao):null});
   window.selecionarCorpusNovo = preview => {
     if (active||submitting||preview.conversa!==conversation||preview.caso_id!==$('codex-caso').value) throw new Error('A conversa mudou. Abra a continuação novamente.');
@@ -206,7 +244,7 @@
     pendingNotebook = null; notebookPreview();
     pendingDiligences = null; diligencePreview();
     ++view; conversation = ''; cursor = 0; active = false;
-    trackingFailed = false; trackingPending = false;
+    trackingFailed = false; trackingPending = false; reconnecting = false; wake?.();
     run = null; resumed = null; retrying = false;
     switchDraft($('codex-caso').value, '');
     currentStage = '';
@@ -476,23 +514,37 @@
     // Invalidate any older observer; retain the cursor and the rendered conversation.
     poll(++view);
   }
+  async function lostConnection(attempt) {
+    reconnecting = true; trackingPending = false;
+    $('codex-status').textContent = offline() ? connectionTexts.offline : connectionTexts.rede;
+    controls();
+    await pause(offline() ? RECONNECT_MS.at(-1) : RECONNECT_MS[Math.min(attempt, RECONNECT_MS.length) - 1]);
+  }
   async function poll(version) {
     const chatId = conversation;
+    let attempt = 0;
     while (version === view && conversation === chatId) {
       try {
         const data = await api('codex-eventos', {conversa:chatId, cursor, espera:20});
         if (version !== view) return;
         if (trackingPending) fail();
-        trackingPending = false; trackingFailed = false;
+        if (reconnecting) $('codex-anuncio').textContent = 'Conexão restabelecida. Acompanhamento retomado.';
+        trackingPending = false; trackingFailed = false; reconnecting = false; attempt = 0;
         for (const [round, inventory] of Object.entries(data.acervos || {})) frozenInventories.set(round, inventory);
-        for (const entry of data.eventos) event(entry, chatId);
+        // One event that fails to render must not hold the cursor back: the next poll (or a
+        // reconnection) would then replay, and duplicate, the events already on screen.
+        let renderFailure = null;
+        for (const entry of data.eventos) { try { event(entry, chatId); } catch (failure) { renderFailure ??= failure; } }
         cursor = data.cursor;
         run = data.conversa;
         state(data.conversa.estado);
         limitations();
+        if (renderFailure) throw renderFailure;
         if (!active && data.eventos.length < 100) { await conversations(); return; }
       } catch (error) {
         if (version !== view) return;
+        if (error.rede) { await lostConnection(++attempt); continue; }
+        reconnecting = false;
         trackingPending = false; trackingFailed = true;
         fail(`Falha ao acompanhar a execução: ${error.message} A execução pode continuar. Use “Reconectar acompanhamento” para voltar a observá-la.`);
         $('codex-status').textContent = 'Conexão da interface interrompida';

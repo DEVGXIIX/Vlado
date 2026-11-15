@@ -25,6 +25,7 @@ from comum import escrever_json, ler_json
 from interface_pesquisa import Servidor
 
 ORIGEM = 'https://vlado.test'
+SENHA = 'senha-longa-de-teste-1'
 CONVERSA_ANA = 'a' * 32
 CONVERSA_BIA = 'b' * 32
 
@@ -67,9 +68,10 @@ class PontaAPontaTest(unittest.TestCase):
         fx.completo()
         fx.caso('beta')
         root = fx.root
-        self.editora, self.token_editora = acesso.criar_convite(root, 'Editora', papel='admin')
-        self.ana, self.token_ana = acesso.criar_convite(root, 'Ana', casos=['alpha'])
-        self.bia, self.token_bia = acesso.criar_convite(root, 'Bia', casos=['alpha'])
+        # Accounts with passwords (acesso v2); the activation happens before the backup.
+        self.editora, self.token_editora = self.criar(root, 'Editora', 'editora', 'admin')
+        self.ana, self.token_ana = self.criar(root, 'Ana', 'ana')
+        self.bia, self.token_bia = self.criar(root, 'Bia', 'bia')
         conta = {'id': self.editora['id'], 'nome': 'Editora'}
         nota = apuracao.executar(root, 'apuracao-nota-salvar', {
             'caso': 'alpha', 'requisicao_id': 'c' * 32, 'titulo': 'Pauta', 'texto': 'Hipótese.'}, conta)['nota']
@@ -89,12 +91,17 @@ class PontaAPontaTest(unittest.TestCase):
         con.close()
         return result
 
-    def entrar(self, token):
-        status, headers, _ = self.request('GET', '/convite/' + token)
-        self.assertEqual(status, 303)
-        cookie = headers['Set-Cookie'].split(';')[0]
-        page = self.request('GET', '/', headers={'Cookie': cookie})[2].decode('utf-8')
-        return cookie, page.split('name="session-token" content="')[1].split('"')[0]
+    @staticmethod
+    def criar(root, nome, login, papel='convidado'):
+        conta, token = acesso.criar_conta(root, nome, login, papel=papel, casos=['alpha'])
+        acesso.ativar(root, token, SENHA)
+        return conta, login
+
+    def entrar(self, login):
+        status, headers, body = self.request('POST', '/api/entrar', json.dumps({'login': login, 'senha': SENHA}),
+                                             {'Content-Type': 'application/json', 'Origin': ORIGEM})
+        self.assertEqual(status, 200, body[:200])
+        return headers['Set-Cookie'].split(';')[0], json.loads(body)['csrf']
 
     def post(self, sessao, operation, data):
         cookie, csrf = sessao

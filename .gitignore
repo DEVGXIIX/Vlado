@@ -8,6 +8,10 @@ tmp/
 .env
 .env.*
 !.env.example
+/deploy/ambientes/*.env
+/.ferramentas/
+/android/saidas/
+/dist/
 *.log
 *.sqlite
 *.sqlite3

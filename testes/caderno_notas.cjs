@@ -176,7 +176,7 @@ test('salvamento automático: uma gravação por vez, revisão mais recente e no
   assert.equal(segunda.texto, 'Versão dois');
   assert.equal(segunda.revisao_nota, 4, 'usa a revisão devolvida pela gravação anterior');
   assert.notEqual(segunda.requisicao_id, f.salvamentos()[0].dados.requisicao_id);
-  assert.equal(mesa.$('apuracao-salvamento').textContent, `Salvo às ${hora('2026-11-13T14:05:00+00:00')}`);
+  assert.equal(mesa.$('apuracao-salvamento').textContent, `Nota salva às ${hora('2026-11-13T14:05:00+00:00')}`);
 });
 
 test('erro de rede preserva o texto e reenvia a mesma requisicao_id', async () => {
@@ -190,12 +190,12 @@ test('erro de rede preserva o texto e reenvia a mesma requisicao_id', async () =
   const {mesa} = f;
   await f.escrever('Texto que não pode sumir');
   await f.avancar();
-  assert.equal(mesa.$('apuracao-salvamento').textContent, 'Não foi possível salvar. Tentando novamente…');
+  assert.equal(mesa.$('apuracao-salvamento').textContent, 'Sem conexão. Rascunho guardado nesta aba; tentando de novo…');
   assert.equal(mesa.$('apuracao-texto').value, 'Texto que não pode sumir');
   await f.avancar();
   const [primeiro, segundo] = f.salvamentos().map(c => c.dados);
   assert.deepEqual(segundo, primeiro, 'mesmo corpo, mesma requisicao_id');
-  assert.equal(mesa.$('apuracao-salvamento').textContent, `Salvo às ${hora('2026-11-13T14:06:00+00:00')}`);
+  assert.equal(mesa.$('apuracao-salvamento').textContent, `Nota salva às ${hora('2026-11-13T14:06:00+00:00')}`);
 });
 
 test('409 para o salvamento automático, não sobrescreve e oferece copiar e depois recarregar', async () => {

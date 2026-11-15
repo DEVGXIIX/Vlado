@@ -31,11 +31,26 @@ function reset() {
   $('pagina').value = ''; $('status').textContent = ''; error();
   resetFindings();
 }
+// A failure marked `rede` never reached the application: no network, or a gateway answering for
+// an unreachable server. Callers may retry it; the operation itself may still be running.
+function networkFailure(message, cause) {
+  const failure = new Error(message);
+  failure.rede = true; failure.cause = cause;
+  return failure;
+}
 async function api(operation, data, binary = false) {
-  const response = await fetch(`/api/${operation}`, {method: 'POST',
-    headers: {'Content-Type': 'application/json', 'X-Session-Token': token}, body: JSON.stringify(data)});
+  let response;
+  try {
+    response = await fetch(`/api/${operation}`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Session-Token': token}, body: JSON.stringify(data)});
+  } catch (cause) { throw networkFailure('Sem conexão com o servidor.', cause); }
   if (binary && response.ok) return response.blob();
-  const result = await response.json();
+  let result;
+  try { result = await response.json(); }
+  catch (cause) {
+    if ([502, 503, 504].includes(response.status)) throw networkFailure('Sem conexão com o servidor.', cause);
+    throw new Error(window.I18N?.erro ? window.I18N.erro({}) : 'Não foi possível completar a operação.');
+  }
   if (!response.ok) {
     // One place turns server errors into the interface language (by `codigo` in English).
     const failure = new Error(window.I18N?.erro ? window.I18N.erro(result) : result.erro || 'Não foi possível completar a operação.');
@@ -180,9 +195,23 @@ $('modo').addEventListener('change', () => {
   }[$('modo').value];
 });
 function download(blob, name) {
+  // App Android: o WebMessageListener injeta window.VladoAndroid só na origem autorizada
+  // ({nome, tipo, base64}); a WebView não grava `blob:` sozinha. Ver docs/ANDROID.md.
+  const ponte = window.VladoAndroid;
+  if (ponte && typeof ponte.postMessage === 'function') {
+    if (blob.size > 25 * 1024 * 1024) { window.alert?.('Arquivo grande demais para baixar pelo app (limite de 25 MB). Use a Mesa no navegador.'); return; }
+    const leitor = new FileReader();
+    leitor.onload = () => {
+      const dados = String(leitor.result);
+      ponte.postMessage(JSON.stringify({nome: name, tipo: blob.type || '', base64: dados.slice(dados.indexOf(',') + 1)}));
+    };
+    leitor.onerror = () => window.alert?.('Não foi possível preparar o arquivo para download.');
+    leitor.readAsDataURL(blob);
+    return;
+  }
   const url = URL.createObjectURL(blob), anchor = element('a');
   anchor.href = url; anchor.download = name; document.body.append(anchor); anchor.click(); anchor.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 30000);
+  setTimeout(() => URL.revokeObjectURL(url), 120000); // slow WebViews may still be reading a large file
 }
 function renderHit(hit, scope, version) {
   const card = element('article', undefined, 'result');

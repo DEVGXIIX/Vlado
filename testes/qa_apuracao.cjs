@@ -12,7 +12,7 @@ const [origin,output,phase,chrome]=process.argv.slice(2);
   page.on('request',r=>{if(!r.url().startsWith(origin)&&!r.url().startsWith('blob:'))external.push(r.url());});
   page.on('response',r=>{if(r.url().includes('/vendor/')&&r.status()!==200)missing.push(r.url());});
   // Notes save by themselves; the form submit only asks for the pending save now. The save state
-  // beside the toolbar says what happened ("Salvo às HH:MM"), with the kind in data-estado.
+  // beside the toolbar says what happened ("Nota salva às HH:MM"), with the kind in data-estado.
   const saveState=target=>target.locator('#apuracao-salvamento').getAttribute('data-estado');
   async function savedOn(target){await target.locator('#apuracao-form').evaluate(form=>form.requestSubmit());await target.waitForFunction(()=>!['pendente','salvando'].includes(document.querySelector('#apuracao-salvamento').dataset.estado));assert.ok(['salvo','',null].includes(await saveState(target)),'nota salva');assert.equal(await target.locator('#apuracao-erro').isHidden(),true);}
   const saved=()=>savedOn(page);
@@ -34,12 +34,12 @@ const [origin,output,phase,chrome]=process.argv.slice(2);
       await editor.write(page,'# Hipótese\n\n**Negrito** e *itálico*\n- item\n> citação\n[link](https://example.org)\n<script>window.NOTA_INJETADA=true</script>');
       assert.equal(await page.locator('#apuracao-previa strong').textContent(),'Negrito');assert.equal(await page.locator('#apuracao-previa em').textContent(),'itálico');
       assert.equal(await page.locator('#apuracao-previa script').count(),0);
-      await saved();assert.equal(await saveState(page),'salvo');assert.match(await page.locator('#apuracao-salvamento').innerText(),/^Salvo às \d{2}:\d{2}/);
-      await page.reload();await page.click('#ver-apuracao');await page.locator('#contexto-caso option[value="alpha"]').waitFor({state:'attached'});await page.selectOption('#contexto-caso','alpha');await note(page,'Nota da repórter').click();await page.locator('#apuracao-vditor .vditor-toolbar').waitFor();await page.waitForFunction(()=>/Hipótese/.test(document.querySelector('#apuracao-texto').value));
+      await saved();assert.equal(await saveState(page),'salvo');assert.match(await page.locator('#apuracao-salvamento').innerText(),/^Nota salva às \d{2}:\d{2}/);
+      await page.reload();await page.click('#ver-apuracao');await page.locator('#contexto-caso option[value="alpha"]').waitFor({state:'attached'});await page.selectOption('#contexto-caso','alpha');await note(page,'Nota da repórter').click();await page.locator('#apuracao-vditor .vditor-toolbar').waitFor({state:'attached'});await page.waitForFunction(()=>/Hipótese/.test(document.querySelector('#apuracao-texto').value));
       await editor.mode(page,'wysiwyg');assert.equal(await page.locator('#apuracao-vditor .vditor-wysiwyg strong').innerText(),'Negrito');await editor.mode(page,'ir');await page.locator('#apuracao-vditor .vditor-ir .vditor-reset').waitFor();await editor.mode(page,'sv');await saved();
       checks.push('Criar nota, salvamento automático com estado visível, recarregar e reabrir; Vditor visual, instantâneo e Markdown preservam texto e formatação.');
       // Second tab conflict must preserve the local unsaved text.
-      const second=await browser.newPage();await second.goto(origin);await second.click('#ver-apuracao');await second.locator('#contexto-caso option[value="alpha"]').waitFor({state:'attached'});await second.selectOption('#contexto-caso','alpha');await note(second,'Nota da repórter').click();await second.locator('#apuracao-vditor .vditor-toolbar').waitFor();await editor.write(second,'Versão salva na segunda janela.');await savedOn(second);
+      const second=await browser.newPage();await second.goto(origin);await second.click('#ver-apuracao');await second.locator('#contexto-caso option[value="alpha"]').waitFor({state:'attached'});await second.selectOption('#contexto-caso','alpha');await note(second,'Nota da repórter').click();await second.locator('#apuracao-vditor .vditor-toolbar').waitFor({state:'attached'});await editor.write(second,'Versão salva na segunda janela.');await savedOn(second);
       await editor.write(page,'Meu rascunho preservado.');await page.locator('#apuracao-form').evaluate(form=>form.requestSubmit());await page.locator('#apuracao-conflito:not([hidden])').waitFor();
       assert.equal(await saveState(page),'conflito');assert.match(await page.locator('#apuracao-conflito').innerText(),/alterada em outra aba/);assert.equal((await editor.read(page)).trim(),'Meu rascunho preservado.');
       page.once('dialog',d=>d.accept());await page.click('#apuracao-recarregar');await page.waitForFunction(()=>document.querySelector('#apuracao-texto').value.trim()==='Versão salva na segunda janela.');assert.equal(await page.locator('#apuracao-conflito').isHidden(),true);await second.close();
@@ -70,7 +70,7 @@ const [origin,output,phase,chrome]=process.argv.slice(2);
       // Exercise actual rich-text input and formatting, then save without waiting for input callbacks.
       await page.click('#apuracao-nova');await page.fill('#apuracao-nota-titulo','Teste visual temporário');await editor.mode(page,'wysiwyg');
       const visual=page.locator('#apuracao-vditor .vditor-wysiwyg .vditor-reset');
-      await visual.fill('Formatação pela barra');await visual.press('Control+A');await page.locator('#apuracao-vditor button[data-type="bold"]').click();
+      await visual.fill('Formatação pela barra');await visual.press('Control+A');await page.click('#apuracao-negrito');
       await page.waitForFunction(()=>document.querySelector('#apuracao-texto').value.includes('**Formatação pela barra**'));
       await visual.fill('Último caractere á');await saved();
       assert.match(await editor.read(page),/Último caractere á/);

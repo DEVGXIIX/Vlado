@@ -260,18 +260,20 @@ class Conversas:
                                      rodadas=selected.get('rodadas', []) if selected else None)
             return {'estado': 'excluido', 'item': item}
 
-    def _conferir_dono(self, identifier, dono):
-        """In pilot mode a guest only reaches conversations created with its own invitation."""
+    def _conferir_dono(self, identifier, dono, casos=None):
+        """In hosted mode a guest only reaches its own conversations, and only while their case stays released."""
         ctx = self._get(identifier)
         if dono is not None and ctx['meta'].get('dono') != dono:
             raise ValueError('Conversa indisponível para este acesso.')
+        if casos is not None and ctx['meta'].get('caso') not in casos:
+            raise ValueError('Conversa indisponível para este acesso.')
         return ctx
 
-    def eventos(self, identifier, after=0, wait=0, dono=None):
+    def eventos(self, identifier, after=0, wait=0, dono=None, casos=None):
         if type(after) is not int or after < 0 or type(wait) is not int or not 0 <= wait <= 20:
             raise ValueError('Cursor/espera inválidos.')
         with self.condition:
-            ctx = self._conferir_dono(identifier, dono)
+            ctx = self._conferir_dono(identifier, dono, casos)
             if after > len(ctx['events']):
                 raise ValueError('Cursor posterior ao histórico.')
             if after == len(ctx['events']) and ctx['meta']['estado'] in ACTIVE and wait:
@@ -1045,10 +1047,8 @@ class Conversas:
 
         The HTTP layer must count this call like a question (acesso.registrar_consulta) and give it
         back (acesso.devolver_consulta) when this method refuses."""
-        ctx = self._conferir_dono(identifier, dono)
+        ctx = self._conferir_dono(identifier, dono, casos)  # the account must still have this case released
         meta = ctx['meta']
-        if casos is not None and meta.get('caso') not in casos:  # invitation no longer covers this case
-            raise ValueError('Conversa indisponível para este acesso.')
         if ctx['busy'] or meta['estado'] in ACTIVE:
             raise ValueError('Esta conversa está em execução. Aguarde o fim ou cancele antes de tentar novamente.')
         situacao = situacao_de(meta)
@@ -1106,9 +1106,9 @@ class Conversas:
         return {'conversa': identifier, 'estado': 'preparando', 'rodada': meta['rodada'],
                 'retomada_da_etapa': pendentes[0] if pendentes else 'publicacao'}
 
-    def cancelar(self, identifier, dono=None):
+    def cancelar(self, identifier, dono=None, casos=None):
         with self.lock:
-            ctx = self._conferir_dono(identifier, dono)
+            ctx = self._conferir_dono(identifier, dono, casos)
             if ctx['meta']['estado'] not in ACTIVE:
                 return {'estado': ctx['meta']['estado']}
             ctx['cancel'] = True
@@ -1250,8 +1250,8 @@ class Conversas:
             self.contexts[identifier]['pipeline'].observed('leitura', hit['referencia'])
         self._event(identifier, 'fonte', hit)
 
-    def fonte(self, identifier, reference, dono=None):
-        self._conferir_dono(identifier, dono)
+    def fonte(self, identifier, reference, dono=None, casos=None):
+        self._conferir_dono(identifier, dono, casos)
         if not isinstance(reference, str) or not re.fullmatch(r'[a-f0-9]{64}', reference):
             raise ValueError('Referência inválida.')
         hit = next((e['dados'] for e in reversed(self.contexts[identifier]['events'])

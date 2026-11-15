@@ -215,7 +215,16 @@
   const active=()=>new URL(location.href).searchParams.get('area')||'inicio';
   const current=()=>window.contextoCaso?.()||'';
   const navigate=name=>showArea(name);
-  function closeMenu(){document.body.classList.remove('mesa-menu-open');$('mesa-menu').setAttribute('aria-expanded','false');$('mesa-menu').setAttribute('aria-label','Abrir navegação');}
+  function closeMenu(){
+    document.body.classList.remove('mesa-menu-open');$('mesa-menu').setAttribute('aria-expanded','false');$('mesa-menu').setAttribute('aria-label','Abrir navegação');
+    window.camadaMesa?.fechada('menu');
+  }
+  function openMenu(){
+    document.body.classList.add('mesa-menu-open');$('mesa-menu').setAttribute('aria-expanded','true');$('mesa-menu').setAttribute('aria-label','Fechar navegação');
+    // Back closes the drawer (Android); focus moves into it for keyboard and screen readers.
+    window.camadaMesa?.abrir('menu',()=>{closeMenu();$('mesa-menu').focus();return true;});
+    $('mesa-sidebar').querySelector('.areas button:not([hidden]),.areas a:not([hidden])')?.focus();
+  }
   function navigation(){
     for(const [name,label]of Object.entries(labels)){
       const node=$('ver-'+name);if(!node)continue;
@@ -315,7 +324,7 @@
   }
   $('mesa-menu').replaceChildren(svg('menu'));
   $('ver-cadastro').before($('ver-documentos'));
-  $('mesa-menu').addEventListener('click',()=>{const open=document.body.classList.toggle('mesa-menu-open');$('mesa-menu').setAttribute('aria-expanded',String(open));$('mesa-menu').setAttribute('aria-label',open?'Fechar navegação':'Abrir navegação');});
+  $('mesa-menu').addEventListener('click',()=>{if(document.body.classList.contains('mesa-menu-open'))closeMenu();else openMenu();});
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&document.body.classList.contains('mesa-menu-open')){closeMenu();$('mesa-menu').focus();}});
   document.addEventListener('click',event=>{
     const link=event.target.closest('a[data-mesa-area]');

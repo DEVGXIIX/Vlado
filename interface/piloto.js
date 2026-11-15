@@ -1,5 +1,5 @@
 'use strict';
-// Hosted pilot: guests stay in "Ask the AI"; administrators manage invitations.
+// Hosted mode: guests stay in "Ask the AI"; administrators manage individual accounts.
 // The server enforces every rule; this script only shapes the screen.
 (() => {
   const body = document.body;
@@ -8,8 +8,13 @@
   const sair = document.getElementById('mesa-sair');
   sair.hidden = false;
   sair.addEventListener('click', async () => {
+    // The Caderno saves what it can first and asks before dropping unsaved text; from then on it
+    // neither saves nor keeps drafts, so nothing is rewritten while the session ends.
+    if (window.prepararSaidaCaderno && !(await window.prepararSaidaCaderno())) return;
     try { await api('sessao-sair', {}); } catch (_) { /* The session is dropped either way. */ }
-    window.location.replace('/');
+    // Unsaved notebook drafts may hold unpublished reporting: never leave them behind on sign-out.
+    try { window.limparRascunhosCaderno?.(); } catch (_) { /* Storage blocked: nothing was kept. */ }
+    window.location.replace('/entrar');
   });
 
   if (body.dataset.papel !== 'admin') {
@@ -22,51 +27,150 @@
 
   const painel = $('acesso-painel');
   painel.hidden = false;
-  const situacoes = {ativo: 'Ativo', revogado: 'Revogado', expirado: 'Expirado'};
+  const situacoes = {ativa: 'Ativa', desativada: 'Desativada', aguardando_senha: 'Aguardando senha'};
+  const papeis = {admin: 'Administração', convidado: 'Convidado'};
+  let catalogoCasos = [];
 
   function mensagem(texto = '') { $('acesso-mensagem').textContent = texto; }
+  function mostrarLink(conta, link) {
+    $('acesso-link-quem').textContent = `${conta.nome} (${conta.login})`;
+    $('acesso-link').value = link;
+    $('acesso-link-caixa').hidden = false;
+    $('acesso-link').focus();
+    $('acesso-link').select();
+  }
+  function esconderLink() {
+    $('acesso-link').value = '';  // the link is never kept on screen longer than needed
+    $('acesso-link-caixa').hidden = true;
+  }
+  $('acesso-copiar').addEventListener('click', async () => {
+    const campo = $('acesso-link');
+    try {
+      await navigator.clipboard.writeText(campo.value);
+      mensagem(t('Link copiado.'));
+    } catch (_) {
+      campo.select();
+      mensagem(t('Selecione o link e copie manualmente.'));
+    }
+  });
+  $('acesso-link-fechar').addEventListener('click', esconderLink);
+
+  function papelAlterado() {
+    const convidado = $('acesso-papel').value === 'convidado';
+    $('acesso-casos-rotulo').hidden = !convidado;
+    $('acesso-cota-rotulo').hidden = !convidado;
+  }
+  $('acesso-papel').addEventListener('change', papelAlterado);
+  papelAlterado();
+
+  const opcoesCasos = selecionados => catalogoCasos.map(c => {
+    const opcao = new Option(c.titulo, c.id);
+    opcao.selected = (selecionados || []).includes(c.id);
+    return opcao;
+  });
   async function casos() {
     try {
-      const dados = await (await fetch('/api/catalogo')).json();
-      $('acesso-casos').replaceChildren(...(dados.casos || []).map(c => new Option(c.titulo, c.id)));
+      const resposta = await fetch('/api/catalogo');
+      const dados = await resposta.json();
+      if (!resposta.ok) throw new Error(window.I18N?.erro ? window.I18N.erro(dados) : dados.erro);
+      catalogoCasos = dados.casos || [];
+      $('acesso-casos').replaceChildren(...opcoesCasos([]));
     } catch (error) { mensagem(error.message); }
   }
-  function item(convite) {
+
+  async function agir(botao, operacao, dados, sucesso) {
+    botao.disabled = true;
+    try {
+      const resultado = await api(operacao, dados);
+      if (resultado.link) mostrarLink(resultado.conta, resultado.link);
+      mensagem(t(sucesso));
+      await listar();
+    } catch (error) { mensagem(error.message); botao.disabled = false; }
+  }
+  function botao(texto, classe, aoClicar) {
+    const novo = element('button', t(texto), classe);
+    novo.type = 'button';
+    novo.addEventListener('click', () => aoClicar(novo));
+    return novo;
+  }
+  function editorCasos(conta, linha) {
+    const formulario = element('form', undefined, 'ia-config');
+    const lista = element('select');
+    lista.multiple = true; lista.size = 4;
+    lista.append(...opcoesCasos(conta.casos));
+    const rotulo = element('label', t('Apurações liberadas')); rotulo.append(lista);
+    const cota = element('input'); cota.type = 'number'; cota.min = '1'; cota.max = '500';
+    cota.value = String(conta.cota_diaria || 20);
+    const rotuloCota = element('label', t('Consultas por dia')); rotuloCota.append(cota);
+    const salvar = element('button', t('Salvar alterações')); salvar.type = 'submit';
+    const acoes = element('div', undefined, 'actions');
+    acoes.append(salvar, botao('Cancelar', 'secondary', () => formulario.remove()));
+    formulario.append(rotulo, rotuloCota, acoes);
+    formulario.addEventListener('submit', event => {
+      event.preventDefault();
+      agir(salvar, 'contas-atualizar', {id: conta.id, casos: [...lista.selectedOptions].map(o => o.value),
+        cota_diaria: Number(cota.value)}, 'Acesso alterado. Vale a partir da próxima ação da pessoa.');
+    });
+    linha.append(formulario);
+    lista.focus();
+  }
+  function item(conta) {
     const linha = element('li');
-    const texto = element('span', `Convite de ${convite.nome} · ${t(situacoes[convite.situacao] || convite.situacao)}`);
-    linha.append(texto);
-    if (convite.situacao === 'ativo') {
-      const botao = element('button', 'Revogar', 'secondary');
-      botao.type = 'button';
-      botao.addEventListener('click', async () => {
-        botao.disabled = true;
-        try { await api('acesso-revogar', {id: convite.id}); mensagem(t('Convite revogado.')); await listar(); }
-        catch (error) { mensagem(error.message); botao.disabled = false; }
-      });
-      linha.append(' ', botao);
+    const texto = element('div');
+    const titulo = element('h4'); titulo.textContent = conta.nome; titulo.translate = false;
+    const detalhes = [conta.login, t(papeis[conta.papel] || conta.papel), t(situacoes[conta.situacao] || conta.situacao)];
+    if (conta.situacao === 'aguardando_senha' && conta.ativacao_vencida) detalhes.push(t('link vencido'));
+    const meta = element('p', detalhes.join(' · '), 'small');
+    texto.append(titulo, meta);
+    if (conta.papel === 'convidado') {
+      const nomes = (conta.casos || []).map(id => (catalogoCasos.find(c => c.id === id) || {titulo: id}).titulo);
+      texto.append(element('p', `${t('Apurações')}: ${nomes.join(', ') || '—'} · ${t('Consultas por dia')}: ${conta.cota_diaria}`, 'small'));
     }
+    const acoes = element('div', undefined, 'inline-actions');
+    if (conta.ativa) {
+      acoes.append(botao('Desativar', 'danger', alvo => {
+        if (window.confirm(t('Desativar esta conta? A pessoa sai na próxima ação.'))) {
+          agir(alvo, 'contas-desativar', {id: conta.id}, 'Conta desativada.');
+        }
+      }));
+    } else {
+      acoes.append(botao('Reativar', 'secondary', alvo => agir(alvo, 'contas-reativar', {id: conta.id}, 'Conta reativada.')));
+    }
+    acoes.append(botao('Recuperar acesso', 'secondary', alvo => {
+      if (window.confirm(t('Gerar novo link de ativação? A senha atual deixa de valer e as sessões abertas são encerradas.'))) {
+        agir(alvo, 'contas-recuperar', {id: conta.id}, 'Novo link de ativação gerado.');
+      }
+    }));
+    if (conta.papel === 'convidado') acoes.append(botao('Alterar apurações', 'secondary', () => editorCasos(conta, linha)));
+    linha.append(texto, acoes);
     return linha;
   }
   async function listar() {
     try {
-      const {convites} = await api('acesso-listar', {});
-      $('acesso-lista').replaceChildren(...(convites.length ? convites.map(item) : [element('li', 'Nenhum convite criado.')]));
+      const {contas} = await api('contas-listar', {});
+      $('acesso-lista').replaceChildren(...(contas.length ? contas.map(item)
+        : [element('li', t('Nenhuma conta criada.'), 'manage-empty')]));
     } catch (error) { mensagem(error.message); }
   }
   $('acesso-form').addEventListener('submit', async event => {
     event.preventDefault();
-    const escolhidos = [...$('acesso-casos').selectedOptions].map(o => o.value);
+    const papel = $('acesso-papel').value;
+    const dados = {nome: $('acesso-nome').value.trim(), login: $('acesso-login').value.trim().toLowerCase(), papel,
+      horas: Number($('acesso-horas').value)};
+    if (papel === 'convidado') {
+      dados.casos = [...$('acesso-casos').selectedOptions].map(o => o.value);
+      dados.cota_diaria = Number($('acesso-cota').value);
+    }
+    const enviar = event.submitter || $('acesso-form').querySelector('button[type="submit"]');
+    if (enviar) enviar.disabled = true;
     try {
-      const resultado = await api('acesso-criar', {nome: $('acesso-nome').value.trim(), casos: escolhidos,
-        cota_diaria: Number($('acesso-cota').value), dias: Number($('acesso-dias').value)});
-      $('acesso-link').value = resultado.link;
-      $('acesso-link').hidden = false; $('acesso-link-aviso').hidden = false;
-      $('acesso-link').select();
-      $('acesso-nome').value = '';
-      mensagem('');
+      const resultado = await api('contas-criar', dados);
+      mostrarLink(resultado.conta, resultado.link);
+      $('acesso-nome').value = ''; $('acesso-login').value = '';
+      mensagem(t('Conta criada. Envie o link de ativação.'));
       await listar();
     } catch (error) { mensagem(error.message); }
+    if (enviar) enviar.disabled = false;
   });
-  casos();
-  listar();
+  casos().then(listar);
 })();

@@ -392,3 +392,81 @@ main:has(#area-achados:not([hidden])) .intro{margin-bottom:16px}
 .areas .eyebrow,.brand-sub{letter-spacing:.06em}
 /* On a tablet the header belongs to the investigation selector; the document version stays in Documentos. */
 @media(max-width:1050px){.app-header .header-note{display:none}}
+/* Frente C — Mesa em tela estreita (320–390 px), toque, teclado virtual e página citada do PDF. */
+:root{--faixa-ambiente:0px}
+.env-banner{position:fixed;top:0;left:0;right:0;z-index:60;margin:0;padding:5px 16px;min-height:28px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:var(--text-sm);font-weight:700;letter-spacing:.02em;line-height:1.3;background:var(--theme-warning-bg);color:var(--theme-warning);border-bottom:2px solid var(--theme-warning-line);overflow-wrap:anywhere}
+.env-banner[hidden]{display:none}
+body[data-ambiente]{padding-top:var(--faixa-ambiente)}
+body[data-ambiente] .app-header{top:var(--faixa-ambiente)}
+@media(min-width:721px){body[data-ambiente] .sidebar{top:var(--faixa-ambiente);height:calc(100dvh - var(--faixa-ambiente))}}
+@media(max-width:720px){body[data-ambiente] .sidebar{top:calc(78px + var(--faixa-ambiente));height:calc(100dvh - 78px - var(--faixa-ambiente))}}
+/* Touch: every control reaches 44 × 44 CSS px on phones and coarse pointers. */
+@media(max-width:720px),(pointer:coarse){
+  main button,main select,main summary,dialog button,dialog select,dialog summary,.sidebar button,.sidebar a,.sidebar summary,.app-header button,.app-header select,
+  main input:not([type=checkbox]):not([type=radio]):not([type=file]),dialog input:not([type=checkbox]):not([type=radio]):not([type=file]){min-height:44px!important}
+  main button,dialog button,.app-header button{min-width:44px!important}
+  #mesa-menu{width:44px;min-width:44px;height:44px}
+  main .human-review-actions button{min-height:44px!important}
+  #mesa-etapas a,.mesa-tabs button,.notebook-tabs button,.mesa-home-section>.section-heading a{display:inline-flex;align-items:center;min-height:44px}
+  .mesa-document-name{min-height:44px;min-width:44px;text-align:left}
+  .feedback-choice,.delete-confirm{min-height:44px}
+  input[type=checkbox],input[type=radio]{width:24px;height:24px}
+}
+@media(max-width:720px){
+  .app-header .persistent-context select{min-height:44px;padding-block:6px}
+  /* Long names, hashes and paths wrap instead of widening the page. */
+  main h1,main h2,main h3,main p,main li,main td,main th,main summary,main label,dialog h2,dialog p,.path{overflow-wrap:anywhere}
+  main .actions,main .inline-actions,dialog .actions{flex-wrap:wrap}
+  main .actions>*,dialog .actions>*{max-width:100%}
+  main select,main input,main textarea{max-width:100%;min-width:0}
+  /* The cited page takes the whole screen; Back closes it. */
+  #original-dialogo{width:100%;max-width:100%;height:100dvh;max-height:100dvh;margin:0;border:0;border-radius:0;padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+  #original-dialogo[open]{display:flex;flex-direction:column;gap:6px}
+  #original-dialogo .section-heading{flex-wrap:nowrap;align-items:center;gap:8px}
+  #original-dialogo h2{font-size:var(--text-lg);margin:0;flex:1;min-width:0}
+  #original-localizacao{margin:0}
+  #original-dialogo .original-workspace{flex:1;min-height:0;height:auto;gap:8px}
+  #original-referencia{max-height:18dvh;overflow:auto;margin:0}
+  #original-conteudo{min-height:0}
+  #original-baixar{width:100%}
+}
+/* pdf.js viewer: the cited page in a canvas, with page navigation and zoom. */
+#original-conteudo:has(.pdf-viewer){overflow:hidden}
+.pdf-viewer{display:flex;flex-direction:column;gap:8px;height:100%;min-height:0}
+.pdf-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.pdf-pages,.pdf-zooms{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.pdf-toolbar button{min-width:44px;min-height:44px;padding:6px 10px;line-height:1}
+.pdf-pages button,.pdf-zooms button:not(:last-child){font-size:var(--text-xl)}
+#original-conteudo .pdf-page-field{display:flex;flex-direction:row;align-items:center;gap:6px;margin:0;font-size:var(--text-sm);font-weight:600;white-space:nowrap}
+#original-conteudo .pdf-page-field input{width:4.2em;min-height:44px;margin:0;padding:6px;text-align:center;font-size:var(--text-base)}
+.pdf-zoom-level{min-width:3.6em;text-align:center;font-variant-numeric:tabular-nums;font-size:var(--text-sm)}
+.pdf-status{margin:0}
+.pdf-stage{flex:1;min-height:240px;overflow:auto;overscroll-behavior:contain;background:var(--theme-reading);border:1px solid var(--line);border-radius:8px;touch-action:pan-x pan-y pinch-zoom}
+.pdf-stage:focus-visible{outline-offset:-3px}
+.pdf-page{position:relative;margin:0 auto;background:white;box-shadow:0 2px 12px var(--theme-shadow-soft)}
+.pdf-page canvas{display:block}
+.pdf-text-layer{position:absolute;inset:0;overflow:clip;opacity:1;line-height:1;text-align:initial;letter-spacing:normal;word-spacing:normal;-webkit-text-size-adjust:none;text-size-adjust:none;forced-color-adjust:none;transform-origin:0 0;z-index:0;--min-font-size:1;--text-scale-factor:calc(var(--total-scale-factor) * var(--min-font-size));--min-font-size-inv:calc(1 / var(--min-font-size))}
+.pdf-text-layer :is(span,br){color:transparent;position:absolute;white-space:pre;cursor:text;transform-origin:0 0;user-select:text}
+.pdf-text-layer>:not(.markedContent),.pdf-text-layer .markedContent span:not(.markedContent){z-index:1;--font-height:0;font-size:calc(var(--text-scale-factor) * var(--font-height));--scale-x:1;--rotate:0deg;transform:rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv))}
+.pdf-text-layer .markedContent{display:contents}
+.pdf-text-layer ::selection{background:rgb(0 90 200 / .3)}
+.pdf-text-layer .pdf-trecho{background:rgb(255 196 0 / .42);border-radius:2px;box-shadow:0 0 0 2px rgb(196 120 0 / .55)}
+@media(forced-colors:active){.pdf-text-layer .pdf-trecho{outline:2px solid Highlight;background:transparent}}
+/* Run tracking: in progress, connection lost (the server keeps running) or interrupted. */
+.run-connection:empty{margin:0;padding:0;border:0}
+.run-connection{margin:8px 0;padding:8px 12px;border-left:4px solid var(--theme-accent-line);background:var(--theme-soft);border-radius:4px;font-weight:600;font-size:var(--text-sm)}
+.run-connection[data-conexao=rede],.run-connection[data-conexao=offline]{border-left-color:var(--theme-warning-line);background:var(--theme-warning-bg);color:var(--theme-warning)}
+.run-connection[data-conexao=retomavel]{border-left-color:var(--theme-notice-line)}
+@media(prefers-reduced-motion:reduce){.sidebar{transition:none}}
+/* Keyboard focus is never hidden behind the sticky header and the environment banner. */
+html{scroll-padding-top:calc(var(--faixa-ambiente) + 96px)}
+@media(max-width:720px){html{scroll-padding-top:calc(var(--faixa-ambiente) + 88px)}}
+/* Short screens (landscape phone, large text): the original scrolls as a whole instead of clipping. */
+@media(max-width:720px) and (max-height:560px),(max-height:420px){
+  #original-dialogo[open]{overflow-y:auto}
+  #original-dialogo .original-workspace{flex:none}
+  #original-referencia{max-height:5.5em}
+  #original-conteudo:has(.pdf-viewer){overflow:visible;height:auto}
+  .pdf-viewer{height:auto}
+  .pdf-stage{flex:none;height:75dvh;min-height:180px}
+}
