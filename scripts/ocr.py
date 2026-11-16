@@ -252,9 +252,10 @@ def _motor_ocrmypdf(pdf: Path, paginas: list, total: int, config: dict) -> dict:
         lado = Path(pasta) / 'texto.txt'
         # --force-ocr nas paginas ja classificadas sem texto util: ignora camadas de texto residuais.
         # A saida PDF e descartada (--output-type none); o original nunca e reescrito.
+        # Saida '-': no Windows os.devnull ('nul') e aberto pelo OCRmyPDF como PDF danificado e o motor falha.
         args = [sys.executable, '-m', 'ocrmypdf', '--quiet', '--force-ocr', '--rotate-pages',
                 '-l', config['idiomas'], '--pages', ','.join(str(p) for p in paginas),
-                '--output-type', 'none', '--sidecar', str(lado), str(pdf), os.devnull]
+                '--output-type', 'none', '--sidecar', str(lado), str(pdf), '-']
         timeout = config['timeout_pagina'] * len(paginas) + 60
         try:
             processo = _executar(args, timeout=timeout, env=_ambiente(config))

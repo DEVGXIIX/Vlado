@@ -614,6 +614,10 @@ function showArea(area) {
   $('selecao-acervo').hidden = ['inicio','cadastro','codex','gerenciar','configuracoes','caderno','apuracao','diligencias'].includes(area);
   currentArea = area; areaHeading(); versionChip();
   if (area === 'achados' && !defaultAnalysis() && !findingCatalog) loadFindingsCatalog();
+  if (area === 'achados' && window.achadosDesatualizados && findingQuery) {
+    window.achadosDesatualizados = false;  // a human mark was saved elsewhere: reload badges and counter
+    searchFindings({...findingQuery});
+  }
   if (area === 'gerenciar') window.dispatchEvent(new Event('gerenciar-abrir'));
   if (area === 'caderno') window.dispatchEvent(new Event('caderno-abrir'));
   if (area === 'apuracao') window.dispatchEvent(new Event('apuracao-abrir'));
@@ -710,16 +714,10 @@ async function openBriefing(artifact, scope, version) {
     source.hidden = false;
     const text = element('div',undefined,'briefing-text');
     const citationButtons = [];
-    // Render only text, headings and explicit finding markers. Source HTML/URLs stay inert.
-    for (const line of result.texto.split(/\r?\n/)) {
-      if (!line.trim()) continue;
-      const heading = /^#{1,6}\s+/.test(line);
-      const paragraph = element(heading ? 'h4' : 'p');
-      const content = heading ? line.replace(/^#{1,6}\s+/,'') : line;
-      let offset = 0;
-      for (const match of content.matchAll(/\[A[0-9]{3,}@v[1-9][0-9]*\]/g)) {
-        paragraph.append(document.createTextNode(content.slice(offset,match.index)));
-        const marker = match[0], id = marker.slice(1,-1).split('@')[0];
+    // Markdown subset rendered with DOM nodes only (never innerHTML): headings, lists, quotes,
+    // rules, bold/italic/code, finding markers and [fonte:sha256] tags. Source HTML/URLs stay inert.
+    const citation = marker => {
+        const id = marker.slice(1,-1).split('@')[0];
         const button = element('button',marker,'citation'); button.type = 'button';
         button.setAttribute('aria-label',`Abrir achado ${marker}`);
         button.setAttribute('aria-controls','achados-detalhe-painel');
@@ -753,9 +751,63 @@ async function openBriefing(artifact, scope, version) {
           }
         }
         });
-        paragraph.append(button); offset = match.index + marker.length;
+        return button;
+    };
+    const INLINE = /\*\*(.+?)\*\*|__(.+?)__|\[A[0-9]{3,}@v[1-9][0-9]*\]|\[fonte:([a-f0-9]{8,64})\]|`([^`]+)`|\*([^*\s](?:[^*]*?[^*\s])?)\*|(?<![\w])_([^_\s](?:[^_]*?[^_\s])?)_(?![\w])/g;
+    function inline(target, content) {
+      let offset = 0;
+      for (const match of content.matchAll(INLINE)) {
+        target.append(document.createTextNode(content.slice(offset, match.index)));
+        const [whole, bold, bold2, source, code, italic, italic2] = match;
+        if (bold !== undefined || bold2 !== undefined) {
+          const strong = element('strong'); inline(strong, bold ?? bold2); target.append(strong);
+        } else if (source) {
+          const tag = element('span', 'fonte', 'briefing-source');
+          tag.title = `Fonte preservada · SHA-256 ${source}`;
+          tag.setAttribute('translate', 'no');
+          target.append(tag);
+        } else if (code !== undefined) {
+          target.append(element('code', code));
+        } else if (italic !== undefined || italic2 !== undefined) {
+          const em = element('em'); inline(em, italic ?? italic2); target.append(em);
+        } else {
+          target.append(citation(whole));
+        }
+        offset = match.index + whole.length;
       }
-      paragraph.append(document.createTextNode(content.slice(offset))); text.append(paragraph);
+      target.append(document.createTextNode(content.slice(offset)));
+    }
+    let list = null, listKind = '', quote = null;
+    const closeBlocks = () => { list = null; listKind = ''; quote = null; };
+    for (const raw of result.texto.split(/\r?\n/)) {
+      const line = raw.trimEnd();
+      if (!line.trim()) { closeBlocks(); continue; }
+      const heading = line.match(/^(#{1,6})\s+(.*)$/);
+      const bullet = line.match(/^\s*[-*+]\s+(.*)$/);
+      const numbered = line.match(/^\s*(\d{1,3})[.)]\s+(.*)$/);
+      const quoted = line.match(/^\s*>\s?(.*)$/);
+      if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) { closeBlocks(); text.append(element('hr')); continue; }
+      if (heading) {
+        closeBlocks();
+        const node = element(heading[1].length <= 2 ? 'h4' : 'h5'); inline(node, heading[2]); text.append(node);
+      } else if (bullet || numbered) {
+        const kind = bullet ? 'ul' : 'ol';
+        if (!list || listKind !== kind) {
+          quote = null; list = element(kind, undefined, 'briefing-list'); listKind = kind;
+          if (numbered && numbered[1] !== '1') list.start = Number(numbered[1]);
+          text.append(list);
+        }
+        const item = element('li'); inline(item, bullet ? bullet[1] : numbered[2]); list.append(item);
+      } else if (quoted) {
+        list = null; listKind = '';
+        if (!quote) { quote = element('blockquote', undefined, 'briefing-quote'); text.append(quote); }
+        const node = element('p'); inline(node, quoted[1]); quote.append(node);
+      } else if (list && /^\s{2,}\S/.test(raw)) {
+        const last = list.lastElementChild; last.append(' '); inline(last, line.trim());
+      } else {
+        closeBlocks();
+        const node = element('p'); inline(node, line); text.append(node);
+      }
     }
     const raw = element('details',undefined,'technical');
     raw.append(element('summary','Detalhes técnicos'),element('p',`${scope.caso}/${scope.rodada}/${scope.revisao} · ${result.artefato.arquivo} · SHA-256: ${artifact.sha256}`,'small path'),element('pre',result.texto,'raw-briefing'));

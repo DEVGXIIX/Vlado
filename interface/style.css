@@ -470,3 +470,14 @@ html{scroll-padding-top:calc(var(--faixa-ambiente) + 96px)}
   .pdf-viewer{height:auto}
   .pdf-stage{flex:none;height:75dvh;min-height:180px}
 }
+/* Briefing: rendered Markdown subset (lists, quotes, rules, code, source tags). */
+.briefing-text h5{font:600 var(--text-base)/1.5 "Source Sans 3","Segoe UI",Arial,sans-serif;margin:20px 0 10px;color:var(--muted);letter-spacing:.02em}
+.briefing-text strong{font-weight:700}
+.briefing-text .briefing-list{margin:14px 0 18px;padding-left:1.4em}
+.briefing-text .briefing-list li{line-height:inherit;margin:0 0 12px;padding-left:.2em}
+.briefing-text .briefing-list li::marker{color:var(--green)}
+.briefing-text .briefing-quote{margin:18px 0;padding:6px 18px;border-left:3px solid var(--green);background:var(--theme-reading);border-radius:0 6px 6px 0}
+.briefing-text .briefing-quote p{margin:8px 0}
+.briefing-text hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.briefing-text code{font:var(--text-sm)/1.5 ui-monospace,Consolas,monospace;background:var(--soft);padding:1px 5px;border-radius:4px}
+.briefing-text .briefing-source{display:inline-block;font:600 var(--text-xs)/1.4 "Source Sans 3","Segoe UI",Arial,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 8px;margin:0 2px;vertical-align:.1em;cursor:help}

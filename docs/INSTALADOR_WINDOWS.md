@@ -8,8 +8,8 @@ O `Vlado-Setup.exe` instala a Mesa do Vlado num computador Windows 10/11 (64 bit
 | --- | --- |
 | Arquivo | `dist/Vlado-Setup.exe` (gerado; fora do git) |
 | Versão | 2.0.0 |
-| Tamanho | 127,1 MB (133.244.422 bytes) |
-| SHA-256 | `6a6dd8df62b58c64fa2c8edb74e4f6cab2d35737db2872482bac38f298a3d625` |
+| Tamanho | 127,1 MB (133.245.221 bytes) |
+| SHA-256 | `0bc6a6ff78cb3f26c798eeaa3217e0e937fe54934c645e10cddce5d158321f70` |
 
 Confira o hash antes de instalar, no PowerShell:
 
@@ -56,6 +56,24 @@ Requisitos: Windows 64 bits, Python 3.12 em `.venv` com `requirements.txt` e `py
 O script baixa as dependências de `instalador/dependencias.json` (versão e SHA-256 fixados; arquivo divergente é recusado) para `.ferramentas\downloads`, extrai Tesseract e Ghostscript dos instaladores originais com 7-Zip (sem executá-los), monta `build\instalador\payload`, congela o `Vlado.exe` com `instalador\vlado.spec` (`console=False`) e compila `instalador\vlado.iss` com Inno Setup 6.5.4 (instalado por usuário em `.ferramentas\innosetup`). Saída: `dist\Vlado-Setup.exe` e `dist\Vlado-Setup.exe.sha256`. Nenhuma etapa abre janela de console.
 
 Arquivos: `scripts/vlado_lancador.py` (lançador), `instalador/vlado.spec`, `instalador/vlado.iss`, `instalador/dependencias.json`, `scripts/gerar_instalador.py`. Avisos de licença: `docs/AVISOS_DE_LICENCA.md`.
+
+## Teste do instalador (15/11/2026, Windows 11, build 0bc6a6ff…321f70)
+
+Instalação de teste numa pasta temporária, com dados isolados (`VLADO_DADOS`), sem navegador e sem tocar em `%LOCALAPPDATA%\Vlado`; tudo removido no fim.
+
+| Verificação | Resultado |
+| --- | --- |
+| Instalação silenciosa `/VERYSILENT /CURRENTUSER` | Saída 0 em ~45 s; log "Administrative install mode: No", sem pedido de administrador; registro de desinstalação em HKCU; atalhos no Menu Iniciar (Vlado, Desinstalar Vlado) e na área de trabalho. |
+| Sem console | `Vlado.exe` com subsistema PE 2 (GUI), sem processo filho nem janela própria. Um vigia de processos durante o OCR viu `gswin64c` e `tesseract` sempre com janela 0; os `cmd`/`conhost` presentes eram do Chrome e do Claude, não do Vlado. |
+| Primeira abertura | `/` → `/primeiro-acesso`; "Criar administrador" respondeu 200 uma vez e 410 (`primeiro_acesso_encerrado`) na segunda; depois `/primeiro-acesso` → `/entrar`. |
+| Login e logout | Login 200, cookie HttpOnly + SameSite=Strict sem Secure; logout 200 e a sessão passa a 401. |
+| OCR de ponta a ponta | PDF sintético só com imagem cadastrado pelo instalado: recibo com `paginas_origem {"1": "ocr"}`, motor OCRmyPDF 16.10.4 com Ghostscript 10.05.1 e Tesseract v5.4.0.20240606 embutidos, `por+eng`, sem avisos. |
+| Encerrar serviço | `codex-desligar` (admin) devolve 200 e o processo `Vlado.exe` termina. |
+| Atualização | Reinstalar por cima: saída 0, `acesso.json` com o mesmo hash. |
+| Desinstalação silenciosa | Saída 0; programa, atalhos e registro removidos; os 36 arquivos de dados (casos, contas, sessões) preservados com o mesmo hash. |
+| Reinstalação | `/` → `/entrar` (sem nova tela de administrador); login com a conta anterior 200. |
+
+Falha encontrada e corrigida neste teste: no Windows o OCRmyPDF recebia `nul` (`os.devnull`) como arquivo de saída e falhava ("unable to find trailer dictionary"); o cadastro caía no motor alternativo (Tesseract direto) e o Ghostscript nunca era usado. A saída passou a ser `-` em `scripts/ocr.py`.
 
 ## Pendências
 

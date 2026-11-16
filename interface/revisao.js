@@ -129,12 +129,17 @@
         registros_sha256:captured.hash, anterior:captured.mark.evento_id,
         estado:$('revisao-estado').value, observacao:$('revisao-observacao').value});
       dialog.close();
+      // Marks belong to case/round/revision (any index generation). Refresh the list, its badges and the
+      // "N of M reviewed" counter even when the dialog was opened from the briefing, a conversation or an
+      // older listing; a list that is not on screen is refreshed the next time Achados opens.
       const current = findingQuery;
-      if (current && captured.version === findingEpoch &&
-          ['caso','rodada','revisao','geracao_achados'].every(key => current[key] === captured.scope[key])) {
+      const saved = `Marcação salva: ${humanReviewStates[result.revisao_humana.estado][0]}. O texto original da IA foi preservado.`;
+      if (current && ['caso','rodada','revisao'].every(key => current[key] === captured.scope[key])) {
         await searchFindings({...current});
-        $('achados-revisao-feedback').textContent = `Marcação salva: ${humanReviewStates[result.revisao_humana.estado][0]}. O texto original da IA foi preservado.`;
+      } else {
+        window.achadosDesatualizados = true;
       }
+      $('achados-revisao-feedback').textContent = saved;
     } catch (error) {
       fail(error.message); $('revisao-situacao').textContent = 'A marcação não foi confirmada. Sua observação continua no formulário.';
       if (error.result?.codigo === 'conferencia_sem_original' && session === captured) {
