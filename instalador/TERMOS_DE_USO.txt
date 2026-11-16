@@ -1,0 +1,34 @@
+VLADO - TERMOS DE USO
+
+O Vlado é uma ferramenta de apuração feita por estudantes de Jornalismo da UNESP Bauru. Esta versão serve para avaliação e para o piloto com redações parceiras. Não redistribua o programa sem autorização do grupo.
+
+SEUS DOCUMENTOS
+
+Os arquivos que você cadastra ficam neste computador, na pasta de dados do Vlado. O reconhecimento de texto (OCR) também roda aqui, sem enviar nada para fora.
+
+Quando você faz uma pergunta, o Vlado manda ao provedor de IA escolhido (OpenAI ou Anthropic) a pergunta e os trechos dos documentos usados para respondê-la. O envio usa a sua chave de API, e valem os termos desse provedor. Combine com o seu editor o que pode sair da redação antes de cadastrar material sensível.
+
+AS RESPOSTAS
+
+A IA erra. Cada resposta traz o documento e a página de onde saiu: abra o original e confira antes de publicar. A decisão editorial é sua.
+
+SEM GARANTIA
+
+O Vlado é oferecido como está, sem garantia de funcionamento ou de adequação a um uso específico. O grupo não responde por perdas de dados, custos de API ou decisões tomadas a partir das respostas. Faça backup da pasta de dados.
+
+PROGRAMAS DE TERCEIROS
+
+O instalador inclui, sem modificação:
+
+  Python 3.12 ............................. PSF License
+  Tesseract OCR 5.4.0 e dados de idioma ... Apache 2.0
+  Ghostscript 10.05.1 ..................... AGPL 3.0
+  PyMuPDF ................................. AGPL 3.0
+  OCRmyPDF ................................ MPL 2.0
+  Bibliotecas da OpenAI e da Anthropic .... Apache 2.0 / MIT
+  Vditor e pdf.js ......................... MIT / Apache 2.0
+  Fontes Source Serif 4 e Source Sans 3 ... SIL Open Font License 1.1
+
+Os textos completos das licenças e os links para o código-fonte do Ghostscript e do Tesseract ficam na pasta "licencas", dentro da pasta onde o Vlado for instalado.
+
+Para instalar, você precisa aceitar estes termos.

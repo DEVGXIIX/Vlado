@@ -9,7 +9,7 @@ O `Vlado-Setup.exe` instala a Mesa do Vlado num computador Windows 10/11 (64 bit
 | Arquivo | `dist/Vlado-Setup.exe` (gerado; fora do git) |
 | Versão | 2.0.0 |
 | Tamanho | 127,1 MB (133.245.221 bytes) |
-| SHA-256 | `0bc6a6ff78cb3f26c798eeaa3217e0e937fe54934c645e10cddce5d158321f70` |
+| SHA-256 | `c567aceb1328d2f16c99e0560b8293998e21291459171ee7e31d3de5c874b984` |
 
 Confira o hash antes de instalar, no PowerShell:
 
@@ -58,6 +58,8 @@ O script baixa as dependências de `instalador/dependencias.json` (versão e SHA
 Arquivos: `scripts/vlado_lancador.py` (lançador), `instalador/vlado.spec`, `instalador/vlado.iss`, `instalador/dependencias.json`, `scripts/gerar_instalador.py`. Avisos de licença: `docs/AVISOS_DE_LICENCA.md`.
 
 ## Teste do instalador (15/11/2026, Windows 11, build 0bc6a6ff…321f70)
+
+O build atual (`c567aceb…c874b984`) difere deste só na página de termos de uso mostrada pelo instalador (`instalador/TERMOS_DE_USO.txt`); o `Vlado.exe` é o mesmo.
 
 Instalação de teste numa pasta temporária, com dados isolados (`VLADO_DADOS`), sem navegador e sem tocar em `%LOCALAPPDATA%\Vlado`; tudo removido no fim.
 

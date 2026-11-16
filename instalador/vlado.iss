@@ -34,7 +34,7 @@ WizardStyle=modern
 ; Vlado.exe holds this mutex while running: setup and uninstall ask to close it first.
 AppMutex=VladoMesaDeApuracao
 CloseApplications=yes
-LicenseFile={#Origem}\payload\licencas\AVISOS_DE_LICENCA.txt
+LicenseFile={#Origem}\payload\licencas\TERMOS_DE_USO.txt
 
 [Languages]
 Name: "ptbr"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"

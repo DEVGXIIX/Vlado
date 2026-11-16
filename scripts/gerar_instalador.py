@@ -133,6 +133,9 @@ def montar_avisos() -> None:
     destino.mkdir(parents=True, exist_ok=True)
     texto = (RAIZ / 'docs' / 'AVISOS_DE_LICENCA.md').read_text(encoding='utf-8')
     (destino / 'AVISOS_DE_LICENCA.txt').write_text(texto, encoding='utf-8-sig')
+    # Page shown and accepted in the installer: plain text written for people, not the Markdown inventory.
+    termos = (RAIZ / 'instalador' / 'TERMOS_DE_USO.txt').read_text(encoding='utf-8')
+    (destino / 'TERMOS_DE_USO.txt').write_text(termos, encoding='utf-8-sig')
 
 
 def icone() -> None:
