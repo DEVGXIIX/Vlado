@@ -1,6 +1,6 @@
 # Guia técnico: implantação, contas e recuperação
 
-Para quem instala e mantém o Vlado hospedado. Substitui `IMPLANTACAO_PILOTO.md` (convites), que agora só aponta para cá. Contrato de sessões e permissões: [CONTRATOS_ENTREGA.md](CONTRATOS_ENTREGA.md). Dados enviados ao provedor de IA: [DADOS_NA_INFERENCIA.md](DADOS_NA_INFERENCIA.md).
+Para quem instala e mantém o Vlado hospedado. Substitui o antigo guia de implantação por convites. Contrato de sessões e permissões: [CONTRATOS_ENTREGA.md](CONTRATOS_ENTREGA.md). Dados enviados ao provedor de IA: [DADOS_NA_INFERENCIA.md](DADOS_NA_INFERENCIA.md).
 
 | Campo | Preencher |
 | --- | --- |

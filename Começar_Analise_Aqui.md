@@ -209,7 +209,7 @@ O acervo público proposto reúne três fatos relevantes da Americanas S.A., de 
 | M1 Proposta técnica | Escolhas da seção 6, premissas, custos e sequência | Grupo confirma contas, acesso e orçamento | Proposta feita; **falta a confirmação do grupo** (seção 12) |
 | M2 Percurso sintético | Adaptador de API + fluxo de seis etapas + citação até a página, só com dados sintéticos | Métricas bloqueantes da seção 7 em 100% no caso sintético | Ensaio real feito em 13/11 com OpenAI `gpt-6.1-sol` no caso sintético: 6 etapas, 2 achados verificados, ~US$ 0,18 e 1 min 41 s (`docs/VERIFICACAO.md`); **falta a conferência humana das métricas bloqueantes** |
 | M3 Desafio de modelos | Sonnet 5.5 × GPT-6.1 Sol no conjunto de validação | Decisão registrada com números em `docs/VERIFICACAO.md` | Os dois provedores funcionam no código; **faltam chaves, PDFs da Americanas e perguntas de referência** |
-| M4 Hospedagem | Convites, isolamento, inglês, teto de gasto, backup | Checklist da seção 8 aprovado em ambiente de ensaio | Modo piloto, convites, interface bilíngue, limites, Docker/Caddy, backup e guia prontos (`docs/IMPLANTACAO_PILOTO.md`); **falta implantar num servidor e passar o checklist** |
+| M4 Hospedagem | Convites, isolamento, inglês, teto de gasto, backup | Checklist da seção 8 aprovado em ambiente de ensaio | Modo piloto, convites, interface bilíngue, limites, Docker/Caddy, backup e guia prontos (`docs/GUIA_TECNICO_IMPLANTACAO.md`); **falta implantar num servidor e passar o checklist** |
 | M5 Aceite | Pessoa externa conclui o percurso | Critério de aceite registrado; link e convites liberados para a janela | Pendente (depende de M2–M4) |
 
 ## 12. Perguntas em aberto **[aberto]**
