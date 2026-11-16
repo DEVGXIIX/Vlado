@@ -32,6 +32,20 @@ Componentes de terceiros distribuídos neste pacote ou instalados pela imagem Do
 | Caddy 2.8 (imagem) | Apache-2.0 | |
 | Python 3.12 (imagem base) | PSF License | |
 
+## Instalador Windows (Vlado-Setup.exe)
+
+O instalador copia para `%LOCALAPPDATA%\Programs\Vlado` o `Vlado.exe` (Python 3.12 e as bibliotecas de `requirements.txt` empacotados pelo PyInstaller) e os programas abaixo, sem modificação. Versões e SHA-256 conferidos em `instalador/dependencias.json`.
+
+| Componente | Licença | Texto e código-fonte |
+| --- | --- | --- |
+| Ghostscript 10.05.1 (`gswin64c.exe`, `gsdll64.dll`) | **AGPL-3.0** | `licencas\ghostscript\` na pasta instalada (LICENSE/COPYING e `CODIGO_FONTE.txt`). Código-fonte correspondente: https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10051/ghostscript-10.05.1.tar.gz. Usado pelo OCRmyPDF como programa externo. |
+| Tesseract OCR 5.4.0 (build UB Mannheim) | Apache-2.0 | `licencas\tesseract\`; código-fonte: https://github.com/tesseract-ocr/tesseract |
+| Dados de idioma `por`, `eng`, `osd` (tessdata 4.1.0) | Apache-2.0 | https://github.com/tesseract-ocr/tessdata |
+| PyMuPDF (dentro do `Vlado.exe`) | **AGPL-3.0** | Ver a observação da tabela acima; o código do Vlado acompanha o pacote. |
+| Python 3.12 (dentro do `Vlado.exe`) | PSF License | |
+| PyInstaller (carregador do `Vlado.exe`) | GPL-2.0 com exceção de bootloader | A exceção permite distribuir o executável gerado. |
+| Inno Setup 6.5.4 (gera o instalador e o desinstalador) | Licença Inno Setup (permissiva) | https://jrsoftware.org/files/is/license.txt |
+
 ## App Android
 
 | Componente | Licença |

@@ -40,7 +40,11 @@ import lixeira
 from indice_sqlite import (ID_CASO, ID_RODADA, ID_GERACAO, caminho_rodada,
                            cobertura, ler_passagem, pesquisar)
 
-ASSETS = Path(__file__).resolve().parents[1] / 'interface'
+# Inside the PyInstaller bundle the interface lives next to the frozen modules (sys._MEIPASS).
+ASSETS = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1])) / 'interface'
+# local: single operator without sign-in; local-contas: accounts over plain HTTP on 127.0.0.1
+# (installed Windows desk); piloto: accounts behind an HTTPS reverse proxy.
+MODOS = ('local', 'local-contas', 'piloto')
 MAX_UPLOAD = 50 * 1024 * 1024
 CADERNO_OPERACOES = ('caderno-documentos', 'caderno-listar', 'caderno-detalhe', 'caderno-salvar',
                      'caderno-cruzar', 'caderno-exportar', 'caderno-original')
@@ -56,7 +60,7 @@ OPERACOES_CONVIDADO = ('codex-status', 'codex-listar', 'codex-perguntar', 'codex
 # Guest operations on an existing conversation: the conversation's case is checked on every call.
 OPERACOES_CONVERSA = ('codex-eventos', 'codex-cancelar', 'codex-original', 'codex-retomar')
 # Before a session exists (hosted mode only): Origin + JSON, no CSRF, small bodies.
-OPERACOES_PUBLICAS = ('entrar', 'ativar', 'ativacao-consultar')
+OPERACOES_PUBLICAS = ('entrar', 'ativar', 'ativacao-consultar', 'primeiro-admin')
 AMBIENTES = ('homologacao', 'editorial', 'demonstracao')
 SEM_SESSAO = 'Sessão expirada ou encerrada. Entre novamente.'
 # Asking and retrying both spend one of the guest's daily questions (given back if refused).
@@ -286,8 +290,8 @@ class Servidor(ThreadingHTTPServer):
         super().server_bind()
 
     def __init__(self, address, root=ROOT, modo='local', origem=None):
-        if modo not in ('local', 'piloto'):
-            raise ValueError('Modo inválido: use local ou piloto.')
+        if modo not in MODOS:
+            raise ValueError('Modo inválido: use local, local-contas ou piloto.')
         if modo == 'piloto':
             partes = urlsplit(origem or '')
             if partes.scheme != 'https' or not partes.netloc or partes.path not in ('', '/') or partes.query:
@@ -326,6 +330,14 @@ class Servidor(ThreadingHTTPServer):
     @property
     def host_permitido(self):
         return urlsplit(self.origem_publica).netloc if self.modo == 'piloto' else f'127.0.0.1:{self.server_port}'
+
+    @property
+    def com_contas(self):
+        return self.modo != 'local'
+
+    def atributos_cookie(self):
+        """HttpOnly + SameSite=Strict always; Secure only over HTTPS (a browser drops Secure cookies on HTTP)."""
+        return 'HttpOnly; ' + ('Secure; ' if self.modo == 'piloto' else '') + 'SameSite=Strict; Path=/'
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -385,6 +397,26 @@ class Handler(BaseHTTPRequestHandler):
             self.acesso_indisponivel = True  # answered with 503, never with a dropped connection
             return None, sid
 
+    def _endereco_socket(self):
+        """The TCP peer, never a forwarded header."""
+        return self.client_address[0]
+
+    def _cliente_local(self):
+        """First-administrator form: loopback peer, local Host and local Origin, whatever proxy settings say."""
+        try:
+            loopback = ipaddress.ip_address(self._endereco_socket()).is_loopback
+        except ValueError:
+            loopback = False
+        return (self.server.modo == 'local-contas' and loopback
+                and self.headers.get('Host') == self.server.host_permitido
+                and self.headers.get('Origin') == self.server.origin)
+
+    def _primeiro_acesso(self):
+        try:
+            return acesso.primeiro_acesso_disponivel(self.server.root)
+        except (ValueError, OSError):
+            return False
+
     def _principal(self):
         """Who is calling: in local mode the single operator (admin); in hosted mode the account session.
 
@@ -427,7 +459,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _ip(self):
         """Socket address; behind a trusted proxy (VLADO_CONFIAR_PROXY=1) the last X-Forwarded-For hop."""
-        if os.environ.get('VLADO_CONFIAR_PROXY', '').strip() == '1':
+        if self.server.modo == 'piloto' and os.environ.get('VLADO_CONFIAR_PROXY', '').strip() == '1':
             saltos = [s.strip() for s in self.headers.get('X-Forwarded-For', '').split(',') if s.strip()]
             try:
                 return str(ipaddress.ip_address(saltos[-1])) if saltos else self.client_address[0]
@@ -456,7 +488,19 @@ class Handler(BaseHTTPRequestHandler):
         if path == '/api/sessao':
             self._sessao_atual()
             return
-        if self.server.modo == 'piloto':
+        if self.server.modo == 'local-contas':
+            if path == '/api/primeiro-acesso':
+                self._json(200, {'disponivel': self._primeiro_acesso()})
+                return
+            primeiro = path in ('/', '/entrar', '/primeiro-acesso') and self._primeiro_acesso()
+            if path == '/primeiro-acesso' and primeiro:
+                self._send(200, (ASSETS / 'entrar.html').read_bytes(), 'text/html; charset=utf-8')
+                return
+            if path == '/primeiro-acesso' or (primeiro and path in ('/', '/entrar')):
+                self._send(303, b'', 'text/plain; charset=utf-8',
+                           {'Location': '/primeiro-acesso' if primeiro else '/entrar'})
+                return
+        if self.server.com_contas:
             if path.startswith('/convite/'):
                 self._convite_antigo()
                 return
@@ -531,7 +575,8 @@ class Handler(BaseHTTPRequestHandler):
                        .replace(b'__IDIOMA_PADRAO__', b'en' if piloto else b'pt')
                        .replace(b'__PAPEL__', principal['papel'].encode('ascii'))
                        .replace(b'__MODO__', self.server.modo.encode('ascii')))
-            extra = {} if piloto else {'Set-Cookie': f'apuracao_session={self.server.token}; HttpOnly; SameSite=Strict; Path=/'}
+            extra = ({} if self.server.com_contas
+                     else {'Set-Cookie': f'apuracao_session={self.server.token}; HttpOnly; SameSite=Strict; Path=/'})
             self._send(200, content, content_type, extra)
         else:
             # Static files revalidate on every load (no stale code after an update) but skip the
@@ -547,7 +592,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         self.__dict__.pop('_principal_requisicao', None)
-        if self.server.modo == 'piloto':
+        if self.server.com_contas:
             # Never read (up to 72 MB of) a body for anonymous or foreign-host requests.
             if not self._allowed():
                 self.close_connection = True
@@ -585,7 +630,7 @@ class Handler(BaseHTTPRequestHandler):
             self._sem_principal(api=True)
             return
         # Pilot mode requires an explicit Origin; local mode keeps accepting same-origin requests without it.
-        origem = self.headers.get('Origin', None if self.server.modo == 'piloto' else self.server.origin)
+        origem = self.headers.get('Origin', None if self.server.com_contas else self.server.origin)
         if (origem != self.server.origin
                 or not secrets.compare_digest(self.headers.get('X-Session-Token', '').encode('utf-8'), principal['csrf'].encode('ascii'))
                 or self.headers.get_content_type() != 'application/json'):
@@ -619,7 +664,7 @@ class Handler(BaseHTTPRequestHandler):
             if operation == 'sessao-sair':
                 acesso.encerrar(self.server.root, self._sessao_piloto()[1])
                 self._send(200, b'{"estado": "encerrada"}', extra={
-                    'Set-Cookie': f'{COOKIE_PILOTO}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'})
+                    'Set-Cookie': f'{COOKIE_PILOTO}=; {self.server.atributos_cookie()}; Max-Age=0'})
                 return
             if operation in CONTAS_OPERACOES:
                 self._json(200, self._contas(operation, data, principal))
@@ -739,7 +784,7 @@ class Handler(BaseHTTPRequestHandler):
                     result = _sem_internos(result)
             else:
                 conta = ({'id': principal['conta'], 'nome': principal['nome']}
-                         if self.server.modo == 'piloto' else None)
+                         if self.server.com_contas else None)
                 abertos = (self.server.originais_abertos(self._chave_originais(principal, data))
                            if operation == 'achados-revisao-salvar' else None)
                 with self.server.cadastro_lock:
@@ -770,8 +815,8 @@ class Handler(BaseHTTPRequestHandler):
         """Authorization by role, checked on every request. Returns (message, code) or None when allowed."""
         if self.server.modo == 'piloto' and operation == 'codex-desligar':
             return 'O serviço hospedado não pode ser encerrado pela interface.', 'servico_nao_encerravel'
-        if operation in CONTAS_OPERACOES and self.server.modo != 'piloto':
-            return 'Contas só existem no modo hospedado.', 'operacao_proibida'
+        if operation in CONTAS_OPERACOES and not self.server.com_contas:
+            return 'Contas só existem nos modos com login.', 'operacao_proibida'
         if principal['papel'] == 'admin':
             return None
         if operation not in OPERACOES_CONVIDADO:
@@ -852,6 +897,9 @@ class Handler(BaseHTTPRequestHandler):
             self._json(400, {'erro': 'Requisição deve ser um objeto JSON.'})
             return
         root = self.server.root
+        if operation == 'primeiro-admin':
+            self._primeiro_admin(data)
+            return
         try:
             if operation == 'entrar':
                 sid, csrf, conta = acesso.entrar(root, data.get('login'), data.get('senha'), ip=self._ip(),
@@ -862,7 +910,7 @@ class Handler(BaseHTTPRequestHandler):
                 publica = {k: conta[k] for k in ('id', 'nome', 'login', 'papel', 'casos')}
                 self._send(200, json.dumps({'conta': publica, 'csrf': csrf, 'destino': destino},
                                            ensure_ascii=False).encode('utf-8'),
-                           extra={'Set-Cookie': f'{COOKIE_PILOTO}={sid}; HttpOnly; Secure; SameSite=Strict; Path=/'})
+                           extra={'Set-Cookie': f'{COOKIE_PILOTO}={sid}; {self.server.atributos_cookie()}'})
             elif operation == 'ativacao-consultar':
                 acesso.limitar_ip(self._ip())
                 self._json(200, acesso.consultar_ativacao(root, data.get('token')))
@@ -882,6 +930,33 @@ class Handler(BaseHTTPRequestHandler):
             self._json(400, {'estado': 'erro', 'codigo': 'senha_invalida' if operation == 'ativar' else 'requisicao_invalida',
                              'erro': str(exc) if isinstance(exc, ValueError) else 'Falha ao ler arquivos do servidor.'})
 
+    def _primeiro_admin(self, data):
+        """'Criar administrador': local mode with accounts, loopback only, while no account exists."""
+        if not self._cliente_local():
+            self._json(403, {'erro': 'Origem ou sessão não autorizada. Recarregue a página.'})
+            return
+        try:
+            acesso.limitar_ip(self._endereco_socket())
+            senha = data.get('senha')
+            if not isinstance(senha, str) or not acesso.SENHA_MIN <= len(senha) <= acesso.SENHA_MAX:
+                self._json(400, {'estado': 'erro', 'codigo': 'senha_invalida',
+                                 'erro': f'A senha deve ter de {acesso.SENHA_MIN} a {acesso.SENHA_MAX} caracteres.'})
+                return
+            if data.get('confirmacao') != senha:
+                self._json(400, {'estado': 'erro', 'codigo': 'senha_diferente', 'erro': 'As duas senhas não coincidem.'})
+                return
+            conta = acesso.criar_primeiro_admin(self.server.root, data.get('nome'), data.get('login'), senha)
+            self._json(200, {'estado': 'criada', 'login': conta['login']})
+        except acesso.PrimeiroAcessoEncerrado as exc:
+            self._json(410, {'estado': 'encerrado', 'codigo': 'primeiro_acesso_encerrado', 'erro': str(exc)})
+        except acesso.RegistroIlegivel:
+            self._json(503, {'estado': 'indisponivel', 'erro': 'Registro de acesso indisponível.'})
+        except acesso.Bloqueado as exc:
+            self._json(429, {'estado': 'bloqueado', 'codigo': 'bloqueado', 'erro': str(exc)})
+        except (ValueError, OSError) as exc:
+            self._json(400, {'estado': 'erro', 'codigo': 'dados_invalidos',
+                             'erro': str(exc) if isinstance(exc, ValueError) else 'Falha ao gravar a conta.'})
+
     def log_message(self, format, *args):
         # Do not print queries, source content or token to the terminal.
         return
@@ -892,17 +967,20 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--porta', type=int, default=8765)
     parser.add_argument('--sem-abrir', action='store_true')
-    parser.add_argument('--modo', choices=('local', 'piloto'), default='local',
-                        help='piloto: contas com login e senha atrás de um proxy HTTPS (ver docs/GUIA_TECNICO_IMPLANTACAO.md)')
+    parser.add_argument('--modo', choices=MODOS, default='local',
+                        help='local-contas: login e senha em http://127.0.0.1 (Mesa instalada no Windows); '
+                             'piloto: contas atrás de um proxy HTTPS (ver docs/GUIA_TECNICO_IMPLANTACAO.md)')
     parser.add_argument('--host', default='127.0.0.1', help='Endereço de escuta; no contêiner use 0.0.0.0')
     parser.add_argument('--origem', help='Endereço público HTTPS do piloto, ex.: https://vlado.example.org')
+    parser.add_argument('--dados', help='Pasta de dados (casos, conversas, contas); padrão: a pasta do projeto')
     args = parser.parse_args()
-    if args.modo == 'local' and args.host != '127.0.0.1':
-        raise SystemExit('No modo local o servidor escuta somente em 127.0.0.1.')
-    with Servidor((args.host, args.porta), modo=args.modo, origem=args.origem) as server:
+    if args.modo != 'piloto' and args.host != '127.0.0.1':
+        raise SystemExit('Nos modos locais o servidor escuta somente em 127.0.0.1.')
+    with Servidor((args.host, args.porta), root=Path(args.dados) if args.dados else ROOT,
+                  modo=args.modo, origem=args.origem) as server:
         print(f'Mesa de apuração ({args.modo}): {server.origin}', flush=True)
         print('Encerre com Ctrl+C.', flush=True)
-        if args.modo == 'local' and not args.sem_abrir:
+        if args.modo != 'piloto' and not args.sem_abrir:
             webbrowser.open(server.origin)
         try:
             server.serve_forever()

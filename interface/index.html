@@ -50,6 +50,7 @@
       <button id="ver-caderno" type="button" aria-pressed="false" aria-controls="area-caderno" hidden>Trechos com fonte</button>
       <p class="eyebrow">ESPAÇO DE TRABALHO</p>
       <button id="ver-gerenciar" type="button" aria-pressed="false" aria-controls="area-gerenciar">Apurações e lixeira</button>
+      <button id="ver-configuracoes" type="button" aria-pressed="false" aria-controls="area-configuracoes" hidden>Configurações</button>
     </nav>
     <details class="first-use"><summary>Como começar</summary><ol><li>Cadastre os arquivos e confira o recibo de cada envio.</li><li>Abra Perguntar à IA, confira a conexão com a API e escolha o caso.</li><li>Envie a pergunta e acompanhe a resposta e as fontes nesta tela.</li></ol><p>A análise é feita online pela API do provedor configurado, com cobrança por uso.</p><p>Atalhos: Ctrl+Enter (⌘+Enter no Mac) envia a pergunta. Em Conferir achados, J e K (ou Alt+↓ e Alt+↑) passam ao achado seguinte e ao anterior.</p></details>
     <p class="mesa-processing">IA com processamento online<span>Conferência editorial por você</span></p>
@@ -191,7 +192,8 @@
       <p class="small">O cadastro prepara o texto dos PDFs; páginas digitalizadas passam por OCR local. Depois de conferir o envio, abra Perguntar à IA.</p>
     </div>
     </section>
-    <section id="area-gerenciar" aria-labelledby="gerenciar-titulo" hidden>
+    <section id="area-configuracoes" aria-labelledby="configuracoes-titulo" hidden>
+      <div class="panel"><h2 id="configuracoes-titulo">Configurações</h2><p class="small">Somente a administração vê esta área. Adicione contas para outras pessoas usarem a Mesa neste computador.</p></div>
       <div id="acesso-painel" class="panel" hidden>
         <h2>Contas de acesso</h2>
         <p class="small">Cada pessoa entra com login e senha próprios. Quem recebe uma conta define a senha pelo link de ativação.</p>
@@ -214,6 +216,8 @@
         <h3>Contas</h3>
         <ul id="acesso-lista" class="manage-list"></ul>
       </div>
+    </section>
+    <section id="area-gerenciar" aria-labelledby="gerenciar-titulo" hidden>
       <div class="panel">
         <div class="section-heading"><h2 id="gerenciar-titulo">Apurações e conversas</h2><button id="gerenciar-atualizar" type="button" class="secondary">Atualizar lista</button></div>
         <p class="small">Exclua o que saiu da sua mesa. Os itens vão para a lixeira e podem ser restaurados; os arquivos continuam preservados no projeto.</p>

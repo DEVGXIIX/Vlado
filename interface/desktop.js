@@ -204,6 +204,7 @@
     apuracao:'M3 4h7l2 2 2-2h7v15h-7l-2 2-2-2H3zM12 6v15',
     diligencias:'M5 21V3h13l-2 4 2 4H5',
     gerenciar:'M3 6h7l2 3h9v11H3z',
+    configuracoes:'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12h2M3 12h2M12 3v2M12 19v2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4',
     plus:'M12 5v14M5 12h14',menu:'M4 6h16M4 12h16M4 18h16'
   };
   // Navigation labels are the area headings (app.js); the hidden notebook tab keeps its own.

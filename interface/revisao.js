@@ -43,7 +43,7 @@
       const author = event.responsavel ? ' · ' + Leitura.autoria(event.responsavel, event.origem) : '';
       list.append(element('p', `${new Date(event.em_utc).toLocaleString('pt-BR')} · ${humanReviewStates[event.estado][0]}${event.observacao ? ' · ' + event.observacao : ''}${author}`, 'small human-review-note'));
     }
-    const pilot = document.body.dataset.modo === 'piloto';
+    const pilot = document.body.dataset.modo !== 'local';
     $('revisao-historico').replaceChildren(Leitura.tecnicos(
       element('p', pilot ? 'No piloto, cada marcação leva o nome da conta da Mesa que a registrou.'
         : 'As marcações são declarações registradas pela interface, sem autenticação individual do jornalista.', 'small'),

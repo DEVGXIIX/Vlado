@@ -99,6 +99,10 @@ class AtivacaoInvalida(ValueError):
     """Unknown, used or expired activation link."""
 
 
+class PrimeiroAcessoEncerrado(ValueError):
+    """The store already has an account: the first-administrator form is gone for good."""
+
+
 def agora() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -412,6 +416,42 @@ def recuperar(root: Path, cid, por='cli', horas=ATIVACAO_HORAS) -> tuple[dict, s
         _evento(dados, 'recuperacao_emitida', cid, por, momento)
     publico = _alterar(root, cid, por, mudar)
     return publico, resultado['token']
+
+
+# --- first administrator (local mode with accounts) ----------------------------------------------
+
+PRIMEIRO_ACESSO_ENCERRADO = 'A conta de administração já foi criada. Entre com login e senha.'
+
+
+def primeiro_acesso_disponivel(root: Path) -> bool:
+    """True only while the store has never held an account (deactivated ones still count)."""
+    with _TRAVA, trava_arquivo(caminho(root)):
+        dados = _ler(root)
+    return not dados['contas'] and not dados.get('primeiro_admin_em')
+
+
+def criar_primeiro_admin(root: Path, nome, login, senha) -> dict:
+    """Create the first administrator with a password, once. The check and the write share the store lock,
+    so two concurrent forms (threads or processes) end with exactly one account."""
+    nome, login, senha = _validar_nome(nome), _validar_login(login), _validar_senha(senha)
+    if not primeiro_acesso_disponivel(root):
+        raise PrimeiroAcessoEncerrado(PRIMEIRO_ACESSO_ENCERRADO)
+    with _VezDoHash():
+        senha_hash = _HASHER.hash(senha)
+    with _TRAVA, trava_arquivo(caminho(root)):
+        dados = _ler(root)
+        if dados['contas'] or dados.get('primeiro_admin_em'):
+            raise PrimeiroAcessoEncerrado(PRIMEIRO_ACESSO_ENCERRADO)
+        momento = agora()
+        cid = secrets.token_hex(8)
+        conta = {'nome': nome, 'login': login, 'papel': 'admin', 'casos': None, 'cota_diaria': None,
+                 'ativa': True, 'senha_hash': senha_hash, 'senha_definida_em': _iso(momento),
+                 'criada_em': _iso(momento), 'criada_por': 'primeiro_acesso'}
+        dados['contas'][cid] = conta
+        dados['primeiro_admin_em'] = _iso(momento)
+        _evento(dados, 'primeiro_admin', cid, 'primeiro_acesso', momento)
+        _gravar(root, dados)
+        return _publico(cid, conta, momento)
 
 
 # --- activation -------------------------------------------------------------------------------

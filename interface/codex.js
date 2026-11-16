@@ -576,7 +576,7 @@
     try {
       await api('codex-desligar', {});
       ++view; active = false;
-      $('codex-status').textContent = 'Serviço encerrado. Para voltar, abra Abrir mesa.vbs.';
+      $('codex-status').textContent = 'Serviço encerrado. Para voltar, abra o Vlado de novo.';
       for (const id of ['codex-enviar','codex-cancelar','codex-conectar','codex-desligar']) $(id).disabled = true;
     } catch (error) { fail(error.message); }
   });

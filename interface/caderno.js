@@ -3,7 +3,7 @@
   const dialog=$('caderno-dialogo'), chosen=new Map();
   let session=null, ready=false, saving=false, loading=false, offset=0, next=null, version=0, dialogVersion=0, catalogVersion=0, lastAuthor='';
   // In the pilot the server signs records with the account name and ignores a typed author.
-  if(document.body.dataset.modo==='piloto'){
+  if(document.body.dataset.modo!=='local'){
     $('caderno-autor').required=false;$('caderno-autor').closest('label').hidden=true;
     $('caderno-autoria-ajuda').textContent='A autoria vem da sua conta da Mesa. Registrar uma anotação não aprova conclusões da IA.';
     $('caderno-descricao').textContent='Trechos, achados e cruzamentos de autoria humana, separados dos resultados da IA. Neste piloto, a autoria vem da conta da Mesa que salva.';

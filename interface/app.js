@@ -595,7 +595,7 @@ function resetFindings() {
 }
 // Each view opens with its area name as the only h1 and the investigation as context.
 const areaNames = {inicio:'Visão geral',cadastro:'Cadastrar arquivos',documentos:'Documentos',codex:'Perguntar à IA',
-  achados:'Conferir achados',apuracao:'Caderno',caderno:'Caderno',diligencias:'Diligências',gerenciar:'Apurações e lixeira'};
+  achados:'Conferir achados',apuracao:'Caderno',caderno:'Caderno',diligencias:'Diligências',gerenciar:'Apurações e lixeira',configuracoes:'Configurações'};
 let currentArea = 'inicio';
 function areaHeading() {
   $('area-titulo').textContent = areaNames[currentArea];
@@ -611,7 +611,7 @@ function showArea(area) {
     $('area-' + name).hidden = area !== name;
     $('ver-' + name).setAttribute('aria-pressed', String(area === name));
   }
-  $('selecao-acervo').hidden = ['inicio','cadastro','codex','gerenciar','caderno','apuracao','diligencias'].includes(area);
+  $('selecao-acervo').hidden = ['inicio','cadastro','codex','gerenciar','configuracoes','caderno','apuracao','diligencias'].includes(area);
   currentArea = area; areaHeading(); versionChip();
   if (area === 'achados' && !defaultAnalysis() && !findingCatalog) loadFindingsCatalog();
   if (area === 'gerenciar') window.dispatchEvent(new Event('gerenciar-abrir'));
@@ -627,7 +627,7 @@ function showArea(area) {
     }).catch(() => { $('codex-conta').textContent = 'Servidor desconectado. Inicie a Mesa novamente.'; });
   }
 }
-for (const area of ['inicio','cadastro','documentos','achados','codex','gerenciar','caderno','apuracao','diligencias']) $('ver-' + area).addEventListener('click', () => showArea(area));
+for (const area of ['inicio','cadastro','documentos','achados','codex','gerenciar','configuracoes','caderno','apuracao','diligencias']) $('ver-' + area).addEventListener('click', () => showArea(area));
 window.addEventListener('acervo-alterado', () => {
   $('cadastro-recibo').hidden = true; $('cadastro-perguntar').hidden=true;
   $('cadastro-inventario').hidden = true;

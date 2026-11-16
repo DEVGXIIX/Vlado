@@ -3,7 +3,7 @@
 // The server enforces every rule; this script only shapes the screen.
 (() => {
   const body = document.body;
-  if (body.dataset.modo !== 'piloto') return;
+  if (body.dataset.modo === 'local') return;  // piloto and local-contas have accounts
   const t = (texto, vars) => (window.I18N ? window.I18N.t(texto, vars) : texto);
   const sair = document.getElementById('mesa-sair');
   sair.hidden = false;
@@ -25,6 +25,8 @@
     return;
   }
 
+  // Settings (account management) exist only for administrators; the server refuses guests anyway.
+  $('ver-configuracoes').hidden = false;
   const painel = $('acesso-painel');
   painel.hidden = false;
   const situacoes = {ativa: 'Ativa', desativada: 'Desativada', aguardando_senha: 'Aguardando senha'};

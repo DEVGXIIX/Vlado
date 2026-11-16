@@ -67,6 +67,36 @@
       <p id="ativar-pronto" hidden><a href="/entrar" data-t="ir_entrar">Entrar com a nova senha</a></p>
     </section>
 
+    <section id="primeiro-secao" hidden aria-labelledby="primeiro-titulo">
+      <h1 id="primeiro-titulo" data-t="titulo_primeiro">Criar administrador</h1>
+      <p class="small" data-t="intro_primeiro">Primeira abertura do Vlado neste computador. Crie a conta de administração; depois, a Mesa sempre pedirá login e senha.</p>
+      <form id="primeiro-form" novalidate>
+        <label for="primeiro-nome"><span data-t="rotulo_nome">Nome</span>
+          <input id="primeiro-nome" name="name" type="text" autocomplete="name" maxlength="120" required>
+        </label>
+        <label for="primeiro-login"><span data-t="rotulo_login">Login</span>
+          <input id="primeiro-login" name="username" type="text" autocomplete="username" autocapitalize="none"
+                 autocorrect="off" spellcheck="false" maxlength="64" required aria-describedby="primeiro-dica-login">
+        </label>
+        <p id="primeiro-dica-login" class="small" data-t="dica_login">De 3 a 64 letras minúsculas, números, ponto, hífen ou sublinhado.</p>
+        <label for="primeiro-senha"><span data-t="rotulo_senha">Senha</span>
+          <span class="entrar-senha-linha">
+            <input id="primeiro-senha" name="new-password" type="password" autocomplete="new-password"
+                   minlength="12" maxlength="256" required aria-describedby="primeiro-dica">
+            <button class="secondary entrar-mostrar" type="button" aria-pressed="false" aria-controls="primeiro-senha"
+                    data-t="mostrar">Mostrar</button>
+          </span>
+        </label>
+        <p id="primeiro-dica" class="small" data-t="dica_senha">De 12 a 256 caracteres. Uma frase longa é mais fácil de lembrar.</p>
+        <label for="primeiro-confirmar"><span data-t="rotulo_confirmar_senha">Repita a senha</span>
+          <input id="primeiro-confirmar" name="confirm-password" type="password" autocomplete="new-password"
+                 minlength="12" maxlength="256" required>
+        </label>
+        <button id="primeiro-enviar" type="submit" data-t="botao_primeiro">Criar administrador</button>
+      </form>
+      <p id="primeiro-pronto" hidden><a href="/entrar" data-t="ir_entrar_conta">Entrar com a nova conta</a></p>
+    </section>
+
     <p id="entrar-mensagem" class="entrar-mensagem" role="alert" aria-live="assertive" tabindex="-1" hidden></p>
     <noscript><p>Ative o JavaScript para entrar. / Enable JavaScript to sign in.</p></noscript>
   </main>

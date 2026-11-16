@@ -26,6 +26,14 @@
       erro_rede: 'Sem conexão com o servidor. Verifique a rede e tente de novo.',
       erro_geral: 'Não foi possível concluir. Recarregue a página e tente de novo.',
       senha_definida: 'Senha definida. Agora entre com seu login e a nova senha.',
+      titulo_primeiro: 'Criar administrador', rotulo_nome: 'Nome',
+      intro_primeiro: 'Primeira abertura do Vlado neste computador. Crie a conta de administração; depois, a Mesa sempre pedirá login e senha.',
+      dica_login: 'De 3 a 64 letras minúsculas, números, ponto, hífen ou sublinhado.',
+      rotulo_confirmar_senha: 'Repita a senha', botao_primeiro: 'Criar administrador', criando: 'Criando…',
+      ir_entrar_conta: 'Entrar com a nova conta', erro_nome_login: 'Informe nome e login válidos.',
+      erro_primeiro_encerrado: 'A conta de administração já existe. Entre com login e senha.',
+      erro_primeiro_local: 'Esta tela só funciona no próprio computador, em http://127.0.0.1.',
+      admin_criado: 'Administrador criado. Agora entre com o login e a senha.',
     },
     en: {
       titulo_pagina: 'Sign in · Vlado', titulo_entrar: 'Sign in to the investigation desk',
@@ -49,6 +57,14 @@
       erro_rede: 'No connection to the server. Check the network and try again.',
       erro_geral: 'Could not finish. Reload the page and try again.',
       senha_definida: 'Password set. Now sign in with your login and the new password.',
+      titulo_primeiro: 'Create administrator', rotulo_nome: 'Name',
+      intro_primeiro: 'First time Vlado opens on this computer. Create the administrator account; from then on the desk always asks for login and password.',
+      dica_login: '3 to 64 lowercase letters, digits, dot, hyphen or underscore.',
+      rotulo_confirmar_senha: 'Repeat the password', botao_primeiro: 'Create administrator', criando: 'Creating…',
+      ir_entrar_conta: 'Sign in with the new account', erro_nome_login: 'Enter a valid name and login.',
+      erro_primeiro_encerrado: 'The administrator account already exists. Sign in with login and password.',
+      erro_primeiro_local: 'This screen only works on this computer, at http://127.0.0.1.',
+      admin_criado: 'Administrator created. Now sign in with the login and password.',
     },
   };
   const CHAVE_IDIOMA = 'vlado-idioma';  // shared with i18n.js
@@ -102,6 +118,10 @@
     if (status === 503) return 'erro_indisponivel';
     if (corpo.codigo === 'ativacao_invalida') return 'erro_ativacao';
     if (corpo.codigo === 'senha_invalida') return 'erro_senha_tamanho';
+    if (corpo.codigo === 'senha_diferente') return 'erro_senha_diferente';
+    if (corpo.codigo === 'primeiro_acesso_encerrado') return 'erro_primeiro_encerrado';
+    if (corpo.codigo === 'dados_invalidos') return 'erro_nome_login';
+    if (status === 403) return 'erro_primeiro_local';
     return 'erro_geral';
   }
   function ocupado(botao, ativo, chave) {
@@ -178,6 +198,35 @@
     });
   }
 
+  function iniciarPrimeiro() {
+    $('primeiro-secao').hidden = false;
+    const botao = $('primeiro-enviar');
+    $('primeiro-nome').focus();
+    $('primeiro-form').addEventListener('submit', async evento => {
+      evento.preventDefault();
+      const nome = $('primeiro-nome').value.trim(), login = $('primeiro-login').value.trim().toLowerCase();
+      const senha = $('primeiro-senha').value, confirmacao = $('primeiro-confirmar').value;
+      if (!nome || !/^[a-z0-9][a-z0-9._-]{2,63}$/.test(login)) { mostrar('erro_nome_login'); return; }
+      if (senha.length < 12 || senha.length > 256) { mostrar('erro_senha_tamanho'); $('primeiro-senha').focus(); return; }
+      if (senha !== confirmacao) { mostrar('erro_senha_diferente'); $('primeiro-confirmar').focus(); return; }
+      ocupado(botao, true, 'criando');
+      try {
+        const {status, corpo} = await enviar('primeiro-admin', {nome, login, senha, confirmacao});
+        if (status === 200) {
+          $('primeiro-form').hidden = true;
+          $('primeiro-pronto').hidden = false;
+          mostrar('admin_criado', true);
+          return;
+        }
+        if (status === 410) { $('primeiro-form').hidden = true; $('primeiro-pronto').hidden = false; }
+        mostrar(erroPara(status, corpo));
+      } catch (_) {
+        mostrar('erro_rede');
+      }
+      ocupado(botao, false);
+    });
+  }
+
   $('entrar-idioma').addEventListener('click', () => {
     lingua = lingua === 'en' ? 'pt' : 'en';
     gravar(CHAVE_IDIOMA, lingua);
@@ -196,6 +245,8 @@
     $('ativar-form').hidden = true;
     $('ativar-pronto').hidden = false;
     mostrar('erro_ativacao', false, false);
+  } else if (window.location.pathname === '/primeiro-acesso') {
+    iniciarPrimeiro();
   } else if (ativacao) {
     // The token leaves the address bar and the history right away; it stays only in this page's memory.
     try { history.replaceState(null, '', '/ativar'); } catch (_) { /* Old browsers keep the address. */ }

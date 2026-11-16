@@ -4,7 +4,7 @@
   let session=null, response=null, documents=null, busy=false, version=0, lastAuthor='';
   const requestId=()=>crypto.randomUUID().replaceAll('-','');
   // In the pilot the server records the account name as the author and ignores a typed one.
-  if(document.body.dataset.modo==='piloto')for(const id of ['diligencias-autor','diligencias-resposta-autor']){$(id).required=false;$(id).closest('label').hidden=true;}
+  if(document.body.dataset.modo!=='local')for(const id of ['diligencias-autor','diligencias-resposta-autor']){$(id).required=false;$(id).closest('label').hidden=true;}
   function deadline(value,state){const [y,m,d]=value.split('-');const today=new Date();const local=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');return `prazo ${d}/${m}/${y}${!['concluida','cancelada'].includes(state)&&value<local?' · vencida':value===local?' · hoje':''}`;}
   $('diligencias-nova').addEventListener('click',()=>{const caso=window.contextoCaso?.() || $('diligencias-caso').value;if(!caso){fail('diligencias-erro','Escolha uma apuração no topo da mesa.');return;}window.abrirDiligencia({caso});});
   function fail(id,message=''){$(id).textContent=message;$(id).hidden=!message;}

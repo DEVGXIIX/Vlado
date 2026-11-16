@@ -80,6 +80,9 @@ def _ambiente(config) -> dict:
     if config.get('tesseract'):
         pasta = str(Path(config['tesseract']).parent)
         env['PATH'] = pasta + os.pathsep + env.get('PATH', '')
+    gs = (env.get('VLADO_GHOSTSCRIPT') or '').strip()
+    if gs and os.path.isfile(gs):
+        env['PATH'] = str(Path(gs).parent) + os.pathsep + env.get('PATH', '')
     return env
 
 
@@ -131,6 +134,9 @@ def _idiomas_ausentes(config):
 
 
 def _ghostscript():
+    proprio = (os.environ.get('VLADO_GHOSTSCRIPT') or '').strip()
+    if proprio and os.path.isfile(proprio):
+        return proprio  # bundled copy (Windows installer); no system PATH needed
     for nome in (('gswin64c', 'gswin32c', 'gs') if os.name == 'nt' else ('gs',)):
         encontrado = shutil.which(nome)
         if encontrado:

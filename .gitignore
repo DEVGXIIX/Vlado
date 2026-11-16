@@ -52,3 +52,6 @@ tmp/
 # Pasta local com os artefatos de entrega (ZIP, APK, guias); fora do git
 /entrega_intercept/
 /dist/
+
+# Saídas do gerador do instalador Windows (scripts/gerar_instalador.py)
+/build/
